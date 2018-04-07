@@ -122,11 +122,16 @@ func (suite *TweetTestSuite) Test() {
 		},
 
 		TestCase{
-			desc:          "his feed should still be empty",
-			method:        "GET",
-			path:          "/tweet/feed",
-			expCode:       200,
-			expBodyMapArr: []map[string]string{},
+			desc:    "should see his own tweet",
+			method:  "GET",
+			path:    "/tweet/feed",
+			expCode: 200,
+			expBodyMapArr: []map[string]string{
+				map[string]string{
+					"tid":     "1",
+					"content": "tweet1",
+				},
+			},
 		},
 
 		TestCase{

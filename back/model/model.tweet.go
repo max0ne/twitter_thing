@@ -6,6 +6,7 @@ import (
 	"strings"
 
 	"github.com/max0ne/twitter_thing/back/db"
+	"github.com/max0ne/twitter_thing/back/util"
 )
 
 // Tweet - -
@@ -89,6 +90,10 @@ func PublishNewTweet(tweet *Tweet, followerTable, tweetTable, bucketTable, poste
 
 	// 2. 发给followers的buckets里
 	followers := GetFollowers(tweet.Uname, followerTable)
+	// 2.1 自己也看到自己的推
+	if !util.Contains(followers, tweet.Uname) {
+		followers = append(followers, tweet.Uname)
+	}
 	for _, follower := range followers {
 		if len(follower) == 0 {
 			continue
