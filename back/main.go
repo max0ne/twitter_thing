@@ -36,14 +36,13 @@ func signup(c *gin.Context) {
 	}
 
 	err = model.SaveUser(model.NewUser(username, password), tables.userTable)
-	if err != nil {
-		// TODO: 500
-	} else {
-		c.JSON(200, gin.H{
-			"status":   "posted",
-			"username": username,
-		})
+	if cerr(c, err) {
+		return
 	}
+	c.JSON(200, gin.H{
+		"status":   "posted",
+		"username": username,
+	})
 }
 
 func login(c *gin.Context) {
@@ -51,8 +50,8 @@ func login(c *gin.Context) {
 	password := c.PostForm("password")
 
 	user, err := model.GetUser(username, tables.userTable)
-	if err != nil {
-		c.JSON(500, err)
+	if cerr(c, err) {
+		return
 	}
 
 	if user != nil {
