@@ -49,12 +49,12 @@ func getPostedBy(vname string, postedByTable *db.Table) []string {
 }
 
 type tweetBucket struct {
-	uname string
-	tid   string
+	Uname string
+	Tid   string
 }
 
 func (tb tweetBucket) toString() string {
-	return fmt.Sprintf("%s_%s", tb.uname, tb.tid)
+	return fmt.Sprintf("%s_%s", tb.Uname, tb.Tid)
 }
 
 func tweetBucketFromString(ss string) tweetBucket {
@@ -70,15 +70,16 @@ func getBucket(uname string, bucketTable *db.Table) ([]tweetBucket, error) {
 }
 
 // PublishNewTweet - -
-func PublishNewTweet(tweet Tweet, followerTable, tweetTable, bucketTable, postedByTable *db.Table) error {
+func PublishNewTweet(tweet *Tweet, followerTable, tweetTable, bucketTable, postedByTable *db.Table) error {
 
+	// -1. gen id
 	tweet.Tid = tweetTable.IncID()
+
+	// 0. store content
 	tweetJSONBytes, err := json.Marshal(tweet)
 	if err != nil {
 		return err
 	}
-
-	// 0. store content
 	tweetTable.Put(tweet.Tid, string(tweetJSONBytes))
 
 	// 1. 发给自己的tweet里
@@ -88,20 +89,25 @@ func PublishNewTweet(tweet Tweet, followerTable, tweetTable, bucketTable, posted
 
 	// 2. 发给followers的buckets里
 	followers := GetFollowers(tweet.Uname, followerTable)
-	newBucketItem := tweetBucket{tid: tweet.Tid, uname: tweet.Uname}
 	for _, follower := range followers {
+		if len(follower) == 0 {
+			continue
+		}
 		buckets, err := getBucket(tweet.Uname, bucketTable)
 		if err != nil {
 			fmt.Println(err)
 			continue
 		}
-		buckets = append(buckets, newBucketItem)
-		bucketTable.PutObj(follower, buckets)
+		buckets = append(buckets, tweetBucket{Tid: tweet.Tid, Uname: tweet.Uname})
+		if err = bucketTable.PutObj(follower, buckets); err != nil {
+			fmt.Println(err)
+			continue
+		}
 	}
 	return nil
 }
 
-// UnfollowUserTweet remove tweets of `vname` from `user.uname`'s buckets
+// UnfollowUserTweet remove tweets of `vname` from `user.Uname`'s buckets
 func UnfollowUserTweet(user User, vname string, bucketTable *db.Table) error {
 	buckets, err := getBucket(user.Uname, bucketTable)
 	if err != nil {
@@ -110,7 +116,7 @@ func UnfollowUserTweet(user User, vname string, bucketTable *db.Table) error {
 
 	newBuckets := []tweetBucket{}
 	for _, buck := range buckets {
-		if buck.uname != vname {
+		if buck.Uname != vname {
 			newBuckets = append(newBuckets, buck)
 		}
 	}
@@ -139,7 +145,7 @@ func GetUserFeed(uname string, tweetTable, bucketTable *db.Table) ([]Tweet, erro
 
 	tweets := []Tweet{}
 	for _, tb := range tbs {
-		tweet, err := GetTweet(tb.tid, tweetTable)
+		tweet, err := GetTweet(tb.Tid, tweetTable)
 		if tweet == nil || err != nil {
 			continue
 		}

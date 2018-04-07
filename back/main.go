@@ -163,15 +163,12 @@ func (s *Server) createNewTweet(c *gin.Context) {
 	}
 
 	tweet := model.NewTweet(middleware.GetUser(c).Uname, param.Content)
-	err := model.PublishNewTweet(tweet, s.tables.followerTable, s.tables.tweetTable, s.tables.bucketTable, s.tables.postedByTable)
+	err := model.PublishNewTweet(&tweet, s.tables.followerTable, s.tables.tweetTable, s.tables.bucketTable, s.tables.postedByTable)
 	if cerr(c, err) {
 		return
 	}
 
-	c.JSON(200, gin.H{
-		"status": "posted",
-		"tweet":  tweet,
-	})
+	c.JSON(200, tweet)
 }
 
 func (s *Server) deleteTweet(c *gin.Context) {

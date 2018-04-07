@@ -2,7 +2,6 @@ package model
 
 import (
 	"encoding/json"
-	"fmt"
 	"strings"
 
 	"github.com/max0ne/twitter_thing/back/db"
@@ -39,7 +38,6 @@ func GetUser(uname string, table *db.Table) (*User, error) {
 
 // GetUserWithPassword - -
 func GetUserWithPassword(uname string, table *db.Table) (*User, error) {
-	fmt.Println(uname, table.Has(uname))
 	if !table.Has(uname) {
 		return nil, nil
 	}

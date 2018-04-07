@@ -2,6 +2,7 @@ package db
 
 import (
 	"encoding/json"
+	"fmt"
 	"sync"
 	"sync/atomic"
 )
@@ -100,5 +101,5 @@ func (t *Table) key(key string) string {
 
 // IncID get auto increment id
 func (t *Table) IncID() string {
-	return string(atomic.AddInt64(&t.incrementID, 1))
+	return fmt.Sprintf("%d", atomic.AddInt64(&t.incrementID, 1))
 }

@@ -12,7 +12,9 @@ import (
 	"github.com/stretchr/testify/suite"
 )
 
+// TestCase an http based test case
 type TestCase struct {
+	desc          string
 	method        string
 	path          string
 	form          map[string]string
@@ -23,11 +25,13 @@ type TestCase struct {
 	postTestCase  func(resp *http.Response)
 }
 
+// RouteTestSuite test http route base suite
 type RouteTestSuite struct {
 	suite.Suite
 	ts *httptest.Server
 }
 
+// SetupTest - -
 func (suite *RouteTestSuite) SetupTest() {
 	router := NewServer().router
 	ts := httptest.NewServer(router)
@@ -35,6 +39,10 @@ func (suite *RouteTestSuite) SetupTest() {
 }
 
 func (suite *RouteTestSuite) runTestCase(tc TestCase) {
+	if tc.desc != "" {
+		fmt.Println("")
+		fmt.Println(">-", tc.desc)
+	}
 	if tc.method == "GET" {
 		suite.testGET(tc)
 	} else if tc.method == "POST" {
@@ -91,13 +99,15 @@ func (suite *RouteTestSuite) assertResponse(tc TestCase, resp *http.Response) {
 	suite.Require().NoError(err)
 	bodyString := string(bodyBytes)
 
-	suite.Require().Equal(tc.expCode, resp.StatusCode, fmt.Sprintf("%s: %s %s", tc.method, tc.path, bodyString))
+	errorMsg := fmt.Sprintf("%s: %s %s", tc.method, tc.path, bodyString)
+	suite.Require().Equal(tc.expCode, resp.StatusCode, errorMsg)
 
 	if tc.expBodyMap != nil {
+		errorMsg := fmt.Sprintf("%s: %s %s %s", tc.method, tc.path, bodyString, util.JSONMarshel(tc.expBodyMap))
 		bodyAsMap := map[string]string{}
-		suite.Require().NoError(json.Unmarshal(bodyBytes, &bodyAsMap))
+		suite.Require().NoError(json.Unmarshal(bodyBytes, &bodyAsMap), errorMsg)
 		for expKey, expVal := range tc.expBodyMap {
-			suite.Require().Equal(expVal, bodyAsMap[expKey], fmt.Sprintf("%s: %s %s", tc.method, tc.path, bodyString))
+			suite.Require().Equal(expVal, bodyAsMap[expKey], errorMsg)
 		}
 	}
 
