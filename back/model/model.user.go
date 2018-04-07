@@ -2,6 +2,7 @@ package model
 
 import (
 	"encoding/json"
+	"strings"
 
 	"github.com/max0ne/twitter_thing/back/db"
 )
@@ -46,5 +47,34 @@ func SaveUser(user User, table *db.Table) error {
 // DeleteUser - -
 func DeleteUser(user User, table *db.Table) error {
 	table.Del(user.Uname)
+	return nil
+}
+
+// Follow - -
+func Follow(user User, vid string, followTable *db.Table) error {
+	followingString := followTable.Get(user.Uname)
+	following := strings.Split(followingString, ",")
+	for _, id := range following {
+		if id == vid {
+			return nil
+		}
+	}
+
+	followTable.Put(user.Uname, followingString+","+vid)
+	return nil
+}
+
+// UnfollowUser - -
+func UnfollowUser(user User, vid string, followTable *db.Table) error {
+	followingString := followTable.Get(user.Uname)
+	following := strings.Split(followingString, ",")
+	newFollowing := []string{}
+	for _, id := range following {
+		if id != vid {
+			newFollowing = append(newFollowing, id)
+		}
+	}
+
+	followTable.Put(user.Uname, strings.Join(newFollowing, ","))
 	return nil
 }

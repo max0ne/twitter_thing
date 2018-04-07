@@ -3,7 +3,10 @@ package main
 import (
 	"net/http"
 
+	"github.com/gin-contrib/cors"
+	"github.com/gin-contrib/sessions"
 	"github.com/max0ne/twitter_thing/back/db"
+	"github.com/max0ne/twitter_thing/back/middleware"
 	"github.com/max0ne/twitter_thing/back/model"
 
 	"github.com/gin-gonic/gin"
@@ -18,6 +21,20 @@ type globalTables struct {
 }
 
 var tables globalTables
+
+func cerr(c *gin.Context, err error) bool {
+	if err != nil {
+		c.JSON(500, err)
+		return true
+	}
+	return false
+}
+
+func sendErr(c *gin.Context, code int, err string) {
+	c.JSON(code, gin.H{
+		"status": err,
+	})
+}
 
 // RESTFul Apis
 func signup(c *gin.Context) {
@@ -39,6 +56,13 @@ func signup(c *gin.Context) {
 	if cerr(c, err) {
 		return
 	}
+
+	sess := sessions.Default(c)
+	sess.Set("uname", username)
+	if cerr(c, sess.Save()) {
+		return
+	}
+
 	c.JSON(200, gin.H{
 		"status":   "posted",
 		"username": username,
@@ -64,26 +88,20 @@ func login(c *gin.Context) {
 		return
 	}
 
+	sess := sessions.Default(c)
+	sess.Set("uname", username)
+	if cerr(c, sess.Save()) {
+		return
+	}
+
 	c.JSON(200, gin.H{
 		"status":   "posted",
 		"username": username,
 	})
 }
 
-func cerr(c *gin.Context, err error) bool {
-	if err != nil {
-		c.JSON(500, err)
-		return true
-	}
-	return false
-}
-
 func unregister(c *gin.Context) {
-	username := c.PostForm("username")
-	user, err := model.GetUser(username, tables.userTable)
-	if cerr(c, err) {
-		return
-	}
+	user := middleware.GetUser(c)
 	if user == nil {
 		c.JSON(http.StatusUnauthorized, gin.H{"status": "user does not exist"})
 		return
@@ -92,14 +110,13 @@ func unregister(c *gin.Context) {
 	model.DeleteUser(*user, tables.userTable)
 	c.JSON(200, gin.H{
 		"status":   "posted",
-		"username": username,
+		"username": user.Uname,
 	})
 }
 
 func createNewTweet(c *gin.Context) {
-	username := c.PostForm("username")
 	content := c.PostForm("content")
-	tweet := model.NewTweet(username, content)
+	tweet := model.NewTweet(middleware.GetUser(c).Uname, content)
 	err := model.PublishNewTweet(tweet, tables.followTable, tables.tweetTable, tables.bucketTable, tables.postedByTable)
 	if cerr(c, err) {
 		return
@@ -112,15 +129,45 @@ func createNewTweet(c *gin.Context) {
 }
 
 func deleteTweet(c *gin.Context) {
+	user := middleware.GetUser(c)
+	tid := c.PostForm("tid")
+	tweet, err := model.GetTweet(tid, tables.tweetTable)
+	if cerr(c, err) {
+		return
+	}
 
+	if tweet.Uname != user.Uname {
+		sendErr(c, http.StatusUnauthorized, user.Uname+" you are not "+tweet.Uname)
+		return
+	}
+
+	model.DelTweet(tid, tables.tweetTable)
 }
 
 func follow(c *gin.Context) {
+	uname := c.PostForm("uname")
+	if uname == "" {
+		sendErr(c, http.StatusBadRequest, "uname required")
+		return
+	}
 
+	model.Follow(*middleware.GetUser(c), uname, tables.followTable)
 }
 
 func unfollow(c *gin.Context) {
+	uname := c.PostForm("uname")
+	if uname == "" {
+		sendErr(c, http.StatusBadRequest, "uname required")
+		return
+	}
 
+	if cerr(c, model.UnfollowUser(*middleware.GetUser(c), uname, tables.followTable)) {
+		return
+	}
+
+	if cerr(c, model.UnfollowUserTweet(*middleware.GetUser(c), uname, tables.bucketTable)) {
+		return
+	}
 }
 
 func main() {
@@ -135,9 +182,17 @@ func main() {
 	}
 
 	router := gin.Default()
+	router.Use(cors.Default())
+
+	cookieStore := sessions.NewCookieStore([]byte("suer_secret_session_secret"))
+	router.Use(sessions.Sessions("defaut_session", cookieStore))
+	router.Use(middleware.InjectUser(tables.userTable))
+
 	router.POST("/signup", signup)
 	router.POST("/login", login)
-	router.POST("/unregister", unregister)
-	router.POST("/createNewTweet", createNewTweet)
+
+	router.POST("/unregister", middleware.RequireLogin, unregister)
+	router.POST("/createNewTweet", middleware.RequireLogin, createNewTweet)
+
 	router.Run()
 }

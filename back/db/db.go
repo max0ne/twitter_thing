@@ -1,6 +1,7 @@
 package db
 
 import (
+	"encoding/json"
 	"sync"
 	"sync/atomic"
 )
@@ -44,8 +45,21 @@ func (t *Table) Put(key, val string) {
 	t.store.m[t.key(key)] = val
 }
 
+// PutObj - -
+func (t *Table) PutObj(key string, val interface{}) error {
+	bytes, err := json.Marshal(val)
+	if err != nil {
+		return err
+	}
+	t.Put(key, string(bytes))
+	return nil
+}
+
 // Del - -
 func (t *Table) Del(key string) {
+	t.store.mLock.Lock()
+	defer t.store.mLock.Unlock()
+
 	delete(t.store.m, t.key(key))
 }
 
@@ -55,6 +69,12 @@ func (t *Table) Get(key string) string {
 	defer t.store.mLock.Unlock()
 
 	return t.store.m[t.key(key)]
+}
+
+// GetObj - -
+func (t *Table) GetObj(key string, target interface{}) error {
+	jsonString := t.Get(key)
+	return json.Unmarshal([]byte(jsonString), target)
 }
 
 // Has has key
