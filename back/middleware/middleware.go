@@ -24,7 +24,7 @@ func InjectUser(userTable *db.Table) gin.HandlerFunc {
 
 		user, _ := model.GetUser(username, userTable)
 		if user != nil {
-			c.Set("user", user)
+			c.Set("user", *user)
 		}
 	}
 }

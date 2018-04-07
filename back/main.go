@@ -43,6 +43,7 @@ type newTweetParam struct {
 
 func cerr(c *gin.Context, err error) bool {
 	if err != nil {
+		fmt.Println(err)
 		c.JSON(500, err)
 		return true
 	}
@@ -56,14 +57,8 @@ func sendErr(c *gin.Context, code int, err string) {
 	})
 }
 
-func sendObj(c *gin.Context, key string, obj interface{}) {
-	resp := gin.H{}
-	if key != "" {
-		resp[key] = obj
-		c.JSON(200, resp)
-	} else {
-		c.JSON(200, obj)
-	}
+func sendObj(c *gin.Context, obj interface{}) {
+	c.JSON(200, obj)
 }
 
 // RESTFul Apis
@@ -158,7 +153,7 @@ func (s *Server) getUser(c *gin.Context) {
 		sendErr(c, http.StatusNotFound, fmt.Sprintf("user %s not found", username))
 		return
 	}
-	sendObj(c, "", *user)
+	sendObj(c, *user)
 }
 
 func (s *Server) createNewTweet(c *gin.Context) {
@@ -223,17 +218,17 @@ func (s *Server) unfollow(c *gin.Context) {
 
 // get users whom i am following
 func (s *Server) getFollowing(c *gin.Context) {
-	sendObj(c, "items",
+	sendObj(c,
 		model.GetUsers(
-			model.GetFollowing((*middleware.GetUser(c)).Uname, s.tables.followingTable), s.tables.userTable,
+			model.GetFollowing(c.Param("uname"), s.tables.followingTable), s.tables.userTable,
 		))
 }
 
 // get users whom i
 func (s *Server) getFollower(c *gin.Context) {
-	sendObj(c, "items",
+	sendObj(c,
 		model.GetUsers(
-			model.GetFollowers((*middleware.GetUser(c)).Uname, s.tables.followerTable), s.tables.userTable,
+			model.GetFollowers(c.Param("uname"), s.tables.followerTable), s.tables.userTable,
 		))
 }
 
@@ -244,7 +239,7 @@ func (s *Server) getUserTweets(c *gin.Context) {
 		return
 	}
 
-	sendObj(c, "items", model.GetUserTweets(uname, s.tables.tweetTable, s.tables.postedByTable))
+	sendObj(c, model.GetUserTweets(uname, s.tables.tweetTable, s.tables.postedByTable))
 }
 
 func (s *Server) getFeed(c *gin.Context) {
@@ -253,7 +248,7 @@ func (s *Server) getFeed(c *gin.Context) {
 		return
 	}
 
-	sendObj(c, "items", tweets)
+	sendObj(c, tweets)
 }
 
 // NewServer - make a server
@@ -293,8 +288,8 @@ func (s *Server) NewRouter() *gin.Engine {
 	router.POST("/user/follow/:uname", middleware.RequireLogin, s.follow)
 	router.POST("/user/unfollow/:uname", middleware.RequireLogin, s.unfollow)
 
-	router.GET("/user/following", middleware.RequireLogin, s.getFollowing)
-	router.GET("/user/follower", s.getFollower)
+	router.GET("/user/following/:uname", s.getFollowing)
+	router.GET("/user/follower/:uname", s.getFollower)
 
 	router.POST("/tweet/new", middleware.RequireLogin, s.createNewTweet)
 	router.POST("/tweet/del/:tid", middleware.RequireLogin, s.deleteTweet)
@@ -304,7 +299,7 @@ func (s *Server) NewRouter() *gin.Engine {
 
 	if gin.IsDebugging() {
 		router.GET("/db", func(c *gin.Context) {
-			sendObj(c, "", s.store.GetM())
+			sendObj(c, s.store.GetM())
 		})
 	}
 	return router

@@ -79,6 +79,9 @@ func (t *Table) Get(key string) string {
 // GetObj - -
 func (t *Table) GetObj(key string, target interface{}) error {
 	jsonString := t.Get(key)
+	if jsonString == "" {
+		return nil
+	}
 	return json.Unmarshal([]byte(jsonString), target)
 }
 
