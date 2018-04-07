@@ -32,7 +32,14 @@ type globalTables struct {
 	followingTable *db.Table
 }
 
-var tables globalTables
+type loginParam struct {
+	Username string `form:"username" json:"username" binding:"required"`
+	Password string `form:"password" json:"password" binding:"required"`
+}
+
+type newTweetParam struct {
+	Content string `form:"content" json:"content" binding:"required"`
+}
 
 func cerr(c *gin.Context, err error) bool {
 	if err != nil {
@@ -43,6 +50,7 @@ func cerr(c *gin.Context, err error) bool {
 }
 
 func sendErr(c *gin.Context, code int, err string) {
+	fmt.Println("err", err)
 	c.JSON(code, gin.H{
 		"status": err,
 	})
@@ -60,16 +68,13 @@ func sendObj(c *gin.Context, key string, obj interface{}) {
 
 // RESTFul Apis
 func (s *Server) signup(c *gin.Context) {
-	username := c.PostForm("username")
-	password := c.PostForm("password")
-
-	if username == "" || password == "" {
-		sendErr(c, http.StatusBadRequest, "username password required"+username+password)
+	var param loginParam
+	if c.Bind(&param) != nil {
 		return
 	}
 
 	// check whether the user already exists
-	oldUser, err := model.GetUser(username, s.tables.userTable)
+	oldUser, err := model.GetUser(param.Username, s.tables.userTable)
 	if cerr(c, err) {
 		return
 	}
@@ -79,28 +84,30 @@ func (s *Server) signup(c *gin.Context) {
 		return
 	}
 
-	err = model.SaveUser(model.NewUser(username, password), s.tables.userTable)
+	err = model.SaveUser(model.NewUser(param.Username, param.Password), s.tables.userTable)
 	if cerr(c, err) {
 		return
 	}
 
 	sess := sessions.Default(c)
-	sess.Set("uname", username)
+	sess.Set("uname", param.Username)
 	if cerr(c, sess.Save()) {
 		return
 	}
 
 	c.JSON(200, gin.H{
 		"status":   "posted",
-		"username": username,
+		"username": param.Username,
 	})
 }
 
 func (s *Server) login(c *gin.Context) {
-	username := c.PostForm("username")
-	password := c.PostForm("password")
+	var param loginParam
+	if c.Bind(&param) != nil {
+		return
+	}
 
-	user, err := model.GetUserWithPassword(username, s.tables.userTable)
+	user, err := model.GetUserWithPassword(param.Username, s.tables.userTable)
 	if cerr(c, err) {
 		return
 	}
@@ -110,20 +117,20 @@ func (s *Server) login(c *gin.Context) {
 		return
 	}
 
-	if user.Password != password {
+	if user.Password != param.Password {
 		c.JSON(http.StatusUnauthorized, gin.H{"status": "wrong password"})
 		return
 	}
 
 	sess := sessions.Default(c)
-	sess.Set("uname", username)
+	sess.Set("uname", param.Username)
 	if cerr(c, sess.Save()) {
 		return
 	}
 
 	c.JSON(200, gin.H{
 		"status":   "posted",
-		"username": username,
+		"username": param.Username,
 	})
 }
 
@@ -151,12 +158,16 @@ func (s *Server) getUser(c *gin.Context) {
 		sendErr(c, http.StatusNotFound, fmt.Sprintf("user %s not found", username))
 		return
 	}
-	sendObj(c, "user", *user)
+	sendObj(c, "", *user)
 }
 
 func (s *Server) createNewTweet(c *gin.Context) {
-	content := c.PostForm("content")
-	tweet := model.NewTweet(middleware.GetUser(c).Uname, content)
+	var param newTweetParam
+	if c.Bind(&param) != nil {
+		return
+	}
+
+	tweet := model.NewTweet(middleware.GetUser(c).Uname, param.Content)
 	err := model.PublishNewTweet(tweet, s.tables.followerTable, s.tables.tweetTable, s.tables.bucketTable, s.tables.postedByTable)
 	if cerr(c, err) {
 		return
@@ -185,7 +196,7 @@ func (s *Server) deleteTweet(c *gin.Context) {
 }
 
 func (s *Server) follow(c *gin.Context) {
-	uname := c.PostForm("uname")
+	uname := c.Param("uname")
 	if uname == "" {
 		sendErr(c, http.StatusBadRequest, "uname required")
 		return
@@ -195,7 +206,7 @@ func (s *Server) follow(c *gin.Context) {
 }
 
 func (s *Server) unfollow(c *gin.Context) {
-	uname := c.PostForm("uname")
+	uname := c.Param("uname")
 	if uname == "" {
 		sendErr(c, http.StatusBadRequest, "uname required")
 		return
@@ -248,7 +259,7 @@ func (s *Server) getFeed(c *gin.Context) {
 // NewServer - make a server
 func NewServer() Server {
 	store := db.NewStore()
-	tables = globalTables{
+	tables := globalTables{
 		userTable:      store.NewTable("userTable"),
 		tweetTable:     store.NewTable("tweetTable"),
 		bucketTable:    store.NewTable("bucketTable"),
@@ -279,8 +290,8 @@ func (s *Server) NewRouter() *gin.Engine {
 	router.POST("/user/unregister", middleware.RequireLogin, s.unregister)
 	router.GET("/user/get/:username", s.getUser)
 
-	router.POST("/user/follow", middleware.RequireLogin, s.follow)
-	router.POST("/user/unfollow", middleware.RequireLogin, s.unfollow)
+	router.POST("/user/follow/:uname", middleware.RequireLogin, s.follow)
+	router.POST("/user/unfollow/:uname", middleware.RequireLogin, s.unfollow)
 
 	router.GET("/user/following", middleware.RequireLogin, s.getFollowing)
 	router.GET("/user/follower", s.getFollower)

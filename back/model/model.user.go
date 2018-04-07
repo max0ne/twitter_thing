@@ -11,7 +11,7 @@ import (
 
 // User - -
 type User struct {
-	Uname    string `json:"uname"`
+	Uname    string `json:"username"`
 	Password string `json:"password"`
 }
 
