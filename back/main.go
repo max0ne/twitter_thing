@@ -17,7 +17,11 @@ type globalTables struct {
 	tweetTable    *db.Table
 	bucketTable   *db.Table
 	postedByTable *db.Table
-	followTable   *db.Table
+
+	// vid -> [uid]
+	followerTable *db.Table
+	// uid -> [vid]
+	followingTable *db.Table
 }
 
 var tables globalTables
@@ -34,6 +38,12 @@ func sendErr(c *gin.Context, code int, err string) {
 	c.JSON(code, gin.H{
 		"status": err,
 	})
+}
+
+func sendObj(c *gin.Context, key string, obj interface{}) {
+	resp := gin.H{}
+	resp[key] = obj
+	c.JSON(200, resp)
 }
 
 // RESTFul Apis
@@ -117,7 +127,7 @@ func unregister(c *gin.Context) {
 func createNewTweet(c *gin.Context) {
 	content := c.PostForm("content")
 	tweet := model.NewTweet(middleware.GetUser(c).Uname, content)
-	err := model.PublishNewTweet(tweet, tables.followTable, tables.tweetTable, tables.bucketTable, tables.postedByTable)
+	err := model.PublishNewTweet(tweet, tables.followerTable, tables.tweetTable, tables.bucketTable, tables.postedByTable)
 	if cerr(c, err) {
 		return
 	}
@@ -151,7 +161,7 @@ func follow(c *gin.Context) {
 		return
 	}
 
-	model.Follow(*middleware.GetUser(c), uname, tables.followTable)
+	model.Follow(*middleware.GetUser(c), uname, tables.followingTable, tables.followerTable)
 }
 
 func unfollow(c *gin.Context) {
@@ -161,7 +171,7 @@ func unfollow(c *gin.Context) {
 		return
 	}
 
-	if cerr(c, model.UnfollowUser(*middleware.GetUser(c), uname, tables.followTable)) {
+	if cerr(c, model.Unfollow(*middleware.GetUser(c), uname, tables.followingTable, tables.followerTable)) {
 		return
 	}
 
@@ -170,15 +180,51 @@ func unfollow(c *gin.Context) {
 	}
 }
 
+// get users whom i am following
+func getFollowing(c *gin.Context) {
+	sendObj(c, "items",
+		model.GetUsers(
+			model.GetFollowing((*middleware.GetUser(c)).Uname, tables.followingTable), tables.userTable,
+		))
+}
+
+// get users whom i
+func getFollower(c *gin.Context) {
+	sendObj(c, "items",
+		model.GetUsers(
+			model.GetFollowers((*middleware.GetUser(c)).Uname, tables.followerTable), tables.userTable,
+		))
+}
+
+func getUserTweets(c *gin.Context) {
+	uname := c.Param("username")
+	if uname == "" {
+		sendErr(c, http.StatusBadRequest, "uname required")
+		return
+	}
+
+	sendObj(c, "items", model.GetUserTweets(uname, tables.tweetTable, tables.postedByTable))
+}
+
+func getFeed(c *gin.Context) {
+	tweets, err := model.GetUserFeed(middleware.GetUser(c).Uname, tables.tweetTable, tables.bucketTable)
+	if cerr(c, err) {
+		return
+	}
+
+	sendObj(c, "items", tweets)
+}
+
 func main() {
 
 	store := db.NewStore()
 	tables = globalTables{
-		userTable:     store.NewTable("userTable"),
-		tweetTable:    store.NewTable("tweetTable"),
-		bucketTable:   store.NewTable("bucketTable"),
-		postedByTable: store.NewTable("postedByTable"),
-		followTable:   store.NewTable("followTable"),
+		userTable:      store.NewTable("userTable"),
+		tweetTable:     store.NewTable("tweetTable"),
+		bucketTable:    store.NewTable("bucketTable"),
+		postedByTable:  store.NewTable("postedByTable"),
+		followerTable:  store.NewTable("followerTable"),
+		followingTable: store.NewTable("followingTable"),
 	}
 
 	router := gin.Default()
@@ -188,11 +234,21 @@ func main() {
 	router.Use(sessions.Sessions("defaut_session", cookieStore))
 	router.Use(middleware.InjectUser(tables.userTable))
 
-	router.POST("/signup", signup)
-	router.POST("/login", login)
+	router.POST("/user/signup", signup)
+	router.POST("/user/login", login)
+	router.POST("/user/unregister", middleware.RequireLogin, unregister)
 
-	router.POST("/unregister", middleware.RequireLogin, unregister)
-	router.POST("/createNewTweet", middleware.RequireLogin, createNewTweet)
+	router.POST("/user/follow", middleware.RequireLogin, follow)
+	router.POST("/user/unfollow", middleware.RequireLogin, unfollow)
+
+	router.GET("/user/following", middleware.RequireLogin, getFollowing)
+	router.GET("/user/follower", getFollower)
+
+	router.POST("/tweet/new", middleware.RequireLogin, createNewTweet)
+	router.POST("/tweet/del/:tid", middleware.RequireLogin, deleteTweet)
+
+	router.GET("/tweet/user/:username", getUserTweets)
+	router.GET("/tweet/feed", middleware.RequireLogin, getFeed)
 
 	router.Run()
 }

@@ -5,6 +5,7 @@ import (
 	"strings"
 
 	"github.com/max0ne/twitter_thing/back/db"
+	"github.com/max0ne/twitter_thing/back/util"
 )
 
 // User - -
@@ -34,6 +35,18 @@ func GetUser(uname string, table *db.Table) (*User, error) {
 	return &User, nil
 }
 
+// GetUsers - -
+func GetUsers(unames []string, userTable *db.Table) []User {
+	users := []User{}
+	for _, uname := range unames {
+		user, err := GetUser(uname, userTable)
+		if user != nil && err == nil {
+			users = append(users, *user)
+		}
+	}
+	return users
+}
+
 // SaveUser - -
 func SaveUser(user User, table *db.Table) error {
 	bytes, err := json.Marshal(user)
@@ -51,30 +64,37 @@ func DeleteUser(user User, table *db.Table) error {
 }
 
 // Follow - -
-func Follow(user User, vid string, followTable *db.Table) error {
-	followingString := followTable.Get(user.Uname)
-	following := strings.Split(followingString, ",")
-	for _, id := range following {
-		if id == vid {
-			return nil
+func Follow(user User, vname string, followingTable, followerTable *db.Table) error {
+
+	insert := func(key, val string, table *db.Table) {
+		vstring := table.Get(key)
+		if util.Contains(strings.Split(vstring, ","), val) {
+			return
 		}
+		table.Put(key, vstring+","+val)
 	}
 
-	followTable.Put(user.Uname, followingString+","+vid)
+	insert(user.Uname, vname, followingTable)
+	insert(vname, user.Uname, followerTable)
 	return nil
 }
 
-// UnfollowUser - -
-func UnfollowUser(user User, vid string, followTable *db.Table) error {
-	followingString := followTable.Get(user.Uname)
-	following := strings.Split(followingString, ",")
-	newFollowing := []string{}
-	for _, id := range following {
-		if id != vid {
-			newFollowing = append(newFollowing, id)
-		}
+// Unfollow - -
+func Unfollow(user User, vname string, followingTable, followerTable *db.Table) error {
+	remove := func(key, val string, table *db.Table) {
+		table.Put(key, strings.Join(util.Remove(strings.Split(table.Get(key), ","), val), ","))
 	}
-
-	followTable.Put(user.Uname, strings.Join(newFollowing, ","))
+	remove(user.Uname, vname, followingTable)
+	remove(vname, user.Uname, followerTable)
 	return nil
+}
+
+// GetFollowers - -
+func GetFollowers(vname string, followerTable *db.Table) []string {
+	return strings.Split(followerTable.Get(vname), ",")
+}
+
+// GetFollowing - -
+func GetFollowing(vname string, followerTable *db.Table) []string {
+	return GetFollowers(vname, followerTable)
 }

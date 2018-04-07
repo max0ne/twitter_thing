@@ -7,7 +7,7 @@
   },
   "scripts": {
     "start": "nodemon -e go,env -s SIGINT -x 'npm run build && npm run serve'",
-    "build": "go build -o twitter-thing",
+    "build": "clear; go build -o twitter-thing || exit 1",
     "serve": "./twitter-thing",
     "test": "go test"
   },

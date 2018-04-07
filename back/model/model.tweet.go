@@ -35,14 +35,17 @@ func GetTweet(tid string, table *db.Table) (*Tweet, error) {
 }
 
 // DelTweet - -
-func DelTweet(tid string, table *db.Table) error {
-	table.Del(tid)
+func DelTweet(tid string, tweetTable *db.Table) error {
+	// only delete from tweet content in tweet table
+	// don't delete from bucket bc there's no way to fast access
+	// all buckets containing this tweet
+	tweetTable.Del(tid)
 	return nil
 }
 
-// getPostedBy return list of `tid`s posted by `vid`
-func getPostedBy(vid string, postedByTable *db.Table) []string {
-	return strings.Split(postedByTable.Get(vid), ",")
+// getPostedBy return list of `tid`s posted by `vname`
+func getPostedBy(vname string, postedByTable *db.Table) []string {
+	return strings.Split(postedByTable.Get(vname), ",")
 }
 
 type tweetBucket struct {
@@ -66,13 +69,8 @@ func getBucket(uname string, bucketTable *db.Table) ([]tweetBucket, error) {
 	return tbs, err
 }
 
-// GetFollowers - -
-func GetFollowers(vid string, followTable *db.Table) []string {
-	return strings.Split(followTable.Get(vid), ",")
-}
-
 // PublishNewTweet - -
-func PublishNewTweet(tweet Tweet, followTable, tweetTable, bucketTable, postedByTable *db.Table) error {
+func PublishNewTweet(tweet Tweet, followerTable, tweetTable, bucketTable, postedByTable *db.Table) error {
 
 	tweet.Tid = tweetTable.IncID()
 	tweetJSONBytes, err := json.Marshal(tweet)
@@ -89,7 +87,7 @@ func PublishNewTweet(tweet Tweet, followTable, tweetTable, bucketTable, postedBy
 	postedByTable.Put(tweet.Uname, postedBy)
 
 	// 2. 发给followers的buckets里
-	followers := GetFollowers(tweet.Uname, followTable)
+	followers := GetFollowers(tweet.Uname, followerTable)
 	newBucketItem := tweetBucket{tid: tweet.Tid, uname: tweet.Uname}
 	for _, follower := range followers {
 		buckets, err := getBucket(tweet.Uname, bucketTable)
@@ -103,8 +101,8 @@ func PublishNewTweet(tweet Tweet, followTable, tweetTable, bucketTable, postedBy
 	return nil
 }
 
-// UnfollowUserTweet remove tweets of `vid` from `user.uname`'s buckets
-func UnfollowUserTweet(user User, vid string, bucketTable *db.Table) error {
+// UnfollowUserTweet remove tweets of `vname` from `user.uname`'s buckets
+func UnfollowUserTweet(user User, vname string, bucketTable *db.Table) error {
 	buckets, err := getBucket(user.Uname, bucketTable)
 	if err != nil {
 		return err
@@ -112,9 +110,40 @@ func UnfollowUserTweet(user User, vid string, bucketTable *db.Table) error {
 
 	newBuckets := []tweetBucket{}
 	for _, buck := range buckets {
-		if buck.uname != vid {
+		if buck.uname != vname {
 			newBuckets = append(newBuckets, buck)
 		}
 	}
 	return bucketTable.PutObj(user.Uname, newBuckets)
+}
+
+// GetUserTweets get all tweets from a specific user
+func GetUserTweets(vname string, tweetTable, postedByTable *db.Table) []Tweet {
+	tids := getPostedBy(vname, postedByTable)
+	tweets := []Tweet{}
+	for _, tid := range tids {
+		tweet, err := GetTweet(tid, tweetTable)
+		if tweet != nil && err == nil {
+			tweets = append(tweets, *tweet)
+		}
+	}
+	return tweets
+}
+
+// GetUserFeed get user's following users's tweets
+func GetUserFeed(uname string, tweetTable, bucketTable *db.Table) ([]Tweet, error) {
+	tbs, err := getBucket(uname, bucketTable)
+	if err != nil {
+		return []Tweet{}, err
+	}
+
+	tweets := []Tweet{}
+	for _, tb := range tbs {
+		tweet, err := GetTweet(tb.tid, tweetTable)
+		if tweet == nil || err != nil {
+			continue
+		}
+		tweets = append(tweets, *tweet)
+	}
+	return tweets, nil
 }
