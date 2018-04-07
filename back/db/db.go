@@ -29,6 +29,11 @@ func NewStore() *Store {
 	return &store
 }
 
+// GetM - for debug only
+func (s *Store) GetM() map[string]string {
+	return s.m
+}
+
 // NewTable - -
 func (s *Store) NewTable(name string) *Table {
 	return &Table{

@@ -1,6 +1,7 @@
 package main
 
 import (
+	"fmt"
 	"net/http"
 
 	"github.com/gin-contrib/cors"
@@ -42,14 +43,23 @@ func sendErr(c *gin.Context, code int, err string) {
 
 func sendObj(c *gin.Context, key string, obj interface{}) {
 	resp := gin.H{}
-	resp[key] = obj
-	c.JSON(200, resp)
+	if key != "" {
+		resp[key] = obj
+		c.JSON(200, resp)
+	} else {
+		c.JSON(200, obj)
+	}
 }
 
 // RESTFul Apis
 func signup(c *gin.Context) {
 	username := c.PostForm("username")
 	password := c.PostForm("password")
+
+	if username == "" || password == "" {
+		sendErr(c, http.StatusBadRequest, "username password required"+username+password)
+		return
+	}
 
 	// check whether the user already exists
 	oldUser, err := model.GetUser(username, tables.userTable)
@@ -83,12 +93,12 @@ func login(c *gin.Context) {
 	username := c.PostForm("username")
 	password := c.PostForm("password")
 
-	user, err := model.GetUser(username, tables.userTable)
+	user, err := model.GetUserWithPassword(username, tables.userTable)
 	if cerr(c, err) {
 		return
 	}
 
-	if user != nil {
+	if user == nil {
 		c.JSON(http.StatusUnauthorized, gin.H{"status": "user does not exist"})
 		return
 	}
@@ -124,6 +134,19 @@ func unregister(c *gin.Context) {
 	})
 }
 
+func getUser(c *gin.Context) {
+	username := c.Param("username")
+	user, err := model.GetUser(username, tables.userTable)
+	if cerr(c, err) {
+		return
+	}
+	if user == nil {
+		sendErr(c, http.StatusNotFound, fmt.Sprintf("user %s not found", username))
+		return
+	}
+	sendObj(c, "user", *user)
+}
+
 func createNewTweet(c *gin.Context) {
 	content := c.PostForm("content")
 	tweet := model.NewTweet(middleware.GetUser(c).Uname, content)
@@ -140,7 +163,7 @@ func createNewTweet(c *gin.Context) {
 
 func deleteTweet(c *gin.Context) {
 	user := middleware.GetUser(c)
-	tid := c.PostForm("tid")
+	tid := c.Param("tid")
 	tweet, err := model.GetTweet(tid, tables.tweetTable)
 	if cerr(c, err) {
 		return
@@ -231,12 +254,13 @@ func main() {
 	router.Use(cors.Default())
 
 	cookieStore := sessions.NewCookieStore([]byte("suer_secret_session_secret"))
-	router.Use(sessions.Sessions("defaut_session", cookieStore))
+	router.Use(sessions.Sessions("ts", cookieStore))
 	router.Use(middleware.InjectUser(tables.userTable))
 
 	router.POST("/user/signup", signup)
 	router.POST("/user/login", login)
 	router.POST("/user/unregister", middleware.RequireLogin, unregister)
+	router.GET("/user/get/:username", getUser)
 
 	router.POST("/user/follow", middleware.RequireLogin, follow)
 	router.POST("/user/unfollow", middleware.RequireLogin, unfollow)
@@ -249,6 +273,9 @@ func main() {
 
 	router.GET("/tweet/user/:username", getUserTweets)
 	router.GET("/tweet/feed", middleware.RequireLogin, getFeed)
+	router.GET("/db", func(c *gin.Context) {
+		sendObj(c, "", store.GetM())
+	})
 
 	router.Run()
 }

@@ -48,7 +48,7 @@ func GetUser(c *gin.Context) *model.User {
 func RequireLogin(c *gin.Context) {
 	user := GetUser(c)
 	if user == nil {
-		c.JSON(http.StatusUnauthorized, gin.H{"status": "login required"})
+		c.AbortWithStatusJSON(http.StatusUnauthorized, gin.H{"status": "login required"})
 		return
 	}
 	c.Next()

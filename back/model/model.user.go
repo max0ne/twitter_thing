@@ -2,6 +2,7 @@ package model
 
 import (
 	"encoding/json"
+	"fmt"
 	"strings"
 
 	"github.com/max0ne/twitter_thing/back/db"
@@ -22,8 +23,23 @@ func NewUser(uname, password string) User {
 	}
 }
 
-// GetUser - -
+// GetUser - remove password field
 func GetUser(uname string, table *db.Table) (*User, error) {
+	if !table.Has(uname) {
+		return nil, nil
+	}
+
+	var User User
+	if err := json.Unmarshal([]byte(table.Get(uname)), &User); err != nil {
+		return nil, err
+	}
+	User.Password = ""
+	return &User, nil
+}
+
+// GetUserWithPassword - -
+func GetUserWithPassword(uname string, table *db.Table) (*User, error) {
+	fmt.Println(uname, table.Has(uname))
 	if !table.Has(uname) {
 		return nil, nil
 	}
