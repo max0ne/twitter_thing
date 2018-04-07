@@ -50,6 +50,7 @@ func signup(c *gin.Context) {
 	for _, u := range user_registered {
 		if u.Username == username {
 			c.JSON(http.StatusUnauthorized, gin.H{"status": "user already exists"})
+			return
 		}
 	}
 	usr_cnt += 1
@@ -63,7 +64,24 @@ func signup(c *gin.Context) {
 }
 
 func login(c *gin.Context) {
+	username := c.PostForm("username")
+	password := c.PostForm("password")
 
+	// check whether the user already exists
+	for _, u := range user_registered {
+		if u.Username == username && u.Password == password {
+			c.JSON(200, gin.H{
+				"status":   "posted",
+				"username": username,
+			})
+			return
+		}
+		if u.Username == username {
+			c.JSON(http.StatusUnauthorized, gin.H{"status": "wrong password"})
+			return
+		}
+	}
+	c.JSON(http.StatusUnauthorized, gin.H{"status": "user does not exist"})
 }
 
 func unregister() {
@@ -93,7 +111,7 @@ func unfollow() {
 func main() {
 	router := gin.Default()
 	router.POST("/signup", signup)
-	router.GET("/login", login)
+	router.POST("/login", login)
 
 	router.Run()
 }
