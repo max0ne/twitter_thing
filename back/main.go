@@ -1,49 +1,23 @@
 package main
 
 import (
-	"fmt"
 	"net/http"
-	"strconv"
-	"time"
+
+	"github.com/max0ne/twitter_thing/back/db"
+	"github.com/max0ne/twitter_thing/back/model"
 
 	"github.com/gin-gonic/gin"
 )
 
-type User struct {
-	Uid      int
-	Username string
-	Password string
+type globalTables struct {
+	userTable     *db.Table
+	tweetTable    *db.Table
+	bucketTable   *db.Table
+	postedByTable *db.Table
+	followTable   *db.Table
 }
 
-type Tweet struct {
-	Uid     int
-	Tid     int
-	Content string
-	Time    string
-}
-
-var user_registered map[int]User
-
-var t_tweet_content map[int]Tweet
-
-var t_tweet_bucket map[int][]int
-
-var t_posted_by map[int][]int
-
-var t_follow map[int][]int
-
-var usr_cnt int
-var tweet_id int
-
-func init() {
-	usr_cnt = 0
-	tweet_id = 0
-	user_registered = make(map[int]User)
-	t_tweet_content = make(map[int]Tweet)
-	t_tweet_bucket = make(map[int][]int)
-	t_posted_by = make(map[int][]int)
-	t_follow = make(map[int][]int)
-}
+var tables globalTables
 
 // RESTFul Apis
 func signup(c *gin.Context) {
@@ -51,15 +25,45 @@ func signup(c *gin.Context) {
 	password := c.PostForm("password")
 
 	// check whether the user already exists
-	for _, u := range user_registered {
-		if u.Username == username {
-			c.JSON(http.StatusUnauthorized, gin.H{"status": "user already exists"})
-			return
-		}
+	oldUser, err := model.GetUser(username, tables.userTable)
+	if cerr(c, err) {
+		return
 	}
-	usr_cnt += 1
-	user := User{usr_cnt, username, password}
-	user_registered[usr_cnt] = user
+
+	if oldUser != nil {
+		c.JSON(http.StatusUnauthorized, gin.H{"status": "user already exists"})
+		return
+	}
+
+	err = model.SaveUser(model.NewUser(username, password), tables.userTable)
+	if err != nil {
+		// TODO: 500
+	} else {
+		c.JSON(200, gin.H{
+			"status":   "posted",
+			"username": username,
+		})
+	}
+}
+
+func login(c *gin.Context) {
+	username := c.PostForm("username")
+	password := c.PostForm("password")
+
+	user, err := model.GetUser(username, tables.userTable)
+	if err != nil {
+		c.JSON(500, err)
+	}
+
+	if user != nil {
+		c.JSON(http.StatusUnauthorized, gin.H{"status": "user does not exist"})
+		return
+	}
+
+	if user.Password != password {
+		c.JSON(http.StatusUnauthorized, gin.H{"status": "wrong password"})
+		return
+	}
 
 	c.JSON(200, gin.H{
 		"status":   "posted",
@@ -67,72 +71,48 @@ func signup(c *gin.Context) {
 	})
 }
 
-func login(c *gin.Context) {
-	username := c.PostForm("username")
-	password := c.PostForm("password")
-
-	for _, u := range user_registered {
-		if u.Username == username && u.Password == password {
-			c.JSON(200, gin.H{
-				"status":   "posted",
-				"username": username,
-			})
-			return
-		}
-		if u.Username == username {
-			c.JSON(http.StatusUnauthorized, gin.H{"status": "wrong password"})
-			return
-		}
+func cerr(c *gin.Context, err error) bool {
+	if err != nil {
+		c.JSON(500, err)
+		return true
 	}
-	c.JSON(http.StatusUnauthorized, gin.H{"status": "user does not exist"})
+	return false
 }
 
 func unregister(c *gin.Context) {
-	// username := c.PostForm("username")
-	// for _, u := range user_registered {
-	// 	if u.Username == username && u.Password == password {
-	// 		c.JSON(200, gin.H{
-	// 			"status":   "posted",
-	// 			"username": username,
-	// 		})
-	// 		return
-	// 	}
-	// 	if u.Username == username {
-	// 		c.JSON(http.StatusUnauthorized, gin.H{"status": "wrong password"})
-	// 		return
-	// 	}
-	// }
-	// c.JSON(http.StatusUnauthorized, gin.H{"status": "user does not exist"})
+	username := c.PostForm("username")
+	user, err := model.GetUser(username, tables.userTable)
+	if cerr(c, err) {
+		return
+	}
+	if user == nil {
+		c.JSON(http.StatusUnauthorized, gin.H{"status": "user does not exist"})
+		return
+	}
+
+	model.DeleteUser(*user, tables.userTable)
+	c.JSON(200, gin.H{
+		"status":   "posted",
+		"username": username,
+	})
 }
 
 func createNewTweet(c *gin.Context) {
-	uid, err := strconv.Atoi(c.PostForm("uid"))
-	if err != nil {
-		fmt.Println(err)
-	}
+	username := c.PostForm("username")
 	content := c.PostForm("content")
-	tweet_id = tweet_id + 1
-
-	tweet := Tweet{uid, tweet_id, content, string(time.Now().Format(time.RFC850))}
-	t_tweet_content[tweet_id] = tweet
-	// 1. 发给自己的tweet里 2. 发给followers的buckets里
-	t_posted_by[uid] = append(t_posted_by[uid], tweet_id)
-
-	followers := t_follow[uid]
-	for _, follower := range followers {
-		t_tweet_bucket[follower] = append(t_tweet_bucket[follower], tweet_id)
+	tweet := model.NewTweet(username, content)
+	err := model.PublishNewTweet(tweet, tables.followTable, tables.tweetTable, tables.bucketTable, tables.postedByTable)
+	if cerr(c, err) {
+		return
 	}
 
 	c.JSON(200, gin.H{
 		"status": "posted",
+		"tweet":  tweet,
 	})
 }
 
 func deleteTweet(c *gin.Context) {
-
-}
-
-func getTweetsById(c *gin.Context) {
 
 }
 
@@ -145,6 +125,16 @@ func unfollow(c *gin.Context) {
 }
 
 func main() {
+
+	store := db.NewStore()
+	tables = globalTables{
+		userTable:     store.NewTable("userTable"),
+		tweetTable:    store.NewTable("tweetTable"),
+		bucketTable:   store.NewTable("bucketTable"),
+		postedByTable: store.NewTable("postedByTable"),
+		followTable:   store.NewTable("followTable"),
+	}
+
 	router := gin.Default()
 	router.POST("/signup", signup)
 	router.POST("/login", login)

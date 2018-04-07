@@ -9,14 +9,14 @@ import (
 type Store struct {
 	m     map[string]string
 	mLock *sync.Mutex
-
-	incrementID int64
 }
 
 // Table - -
 type Table struct {
 	Name  string
 	store *Store
+
+	incrementID int64
 }
 
 // NewStore - -
@@ -29,8 +29,8 @@ func NewStore() *Store {
 }
 
 // NewTable - -
-func (s *Store) NewTable(name string) Table {
-	return Table{
+func (s *Store) NewTable(name string) *Table {
+	return &Table{
 		Name:  name,
 		store: s,
 	}
@@ -42,6 +42,11 @@ func (t *Table) Put(key, val string) {
 	defer t.store.mLock.Unlock()
 
 	t.store.m[t.key(key)] = val
+}
+
+// Del - -
+func (t *Table) Del(key string) {
+	delete(t.store.m, t.key(key))
 }
 
 // Get - -
@@ -65,7 +70,7 @@ func (t *Table) key(key string) string {
 	return t.Name + "_" + key
 }
 
-// GenID get auto increment id
-func (s *Store) GenID() string {
-	return string(atomic.AddInt64(&s.incrementID, 1))
+// IncID get auto increment id
+func (t *Table) IncID() string {
+	return string(atomic.AddInt64(&t.incrementID, 1))
 }
