@@ -21,8 +21,8 @@ class TweetTable extends Component {
   }
 
   renderDeleteTweetBox(tweet) {
-    const username = this.props.currentUser && this.props.currentUser.username;
-    if (_.isNil(username)) {
+    const uname = this.props.currentUser && this.props.currentUser.uname;
+    if (_.isNil(uname)) {
       return;
     }
     return (

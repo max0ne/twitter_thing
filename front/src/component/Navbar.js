@@ -19,7 +19,7 @@ class Navbar extends Component {
             _.isNil(this.props.currentUser) ? (
               <Menu.Item name='signup' as={Link} to={`/login`}>Login</Menu.Item>
             ) : (
-                <Menu.Item name='me' as={Link} to={`/feed/${this.props.currentUser.username}`}>{this.props.currentUser.username}</Menu.Item>
+                <Menu.Item name='me' as={Link} to={`/feed/${this.props.currentUser.uname}`}>{this.props.currentUser.uname}</Menu.Item>
             )
         }
         </Menu.Menu>

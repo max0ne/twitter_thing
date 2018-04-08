@@ -14,17 +14,17 @@ const storeTokenIfPresent = (resp) => {
   }
 }
 
-export async function signup(username, password) {
+export async function signup(uname, password) {
   const resp = await client.post('/user/signup', {
-    username, password,
+    uname, password,
   });
   storeTokenIfPresent(resp);
   return resp;
 }
 
-export async function login(username, password) {
+export async function login(uname, password) {
   const resp = await client.post('/user/login', {
-    username, password,
+    uname, password,
   });
 
   storeTokenIfPresent(resp);
@@ -37,8 +37,8 @@ export async function unregister() {
   return resp;
 }
 
-export async function getUser(username) {
-  return client.get(`/user/get/${username}`);
+export async function getUser(uname) {
+  return client.get(`/user/get/${uname}`);
 }
 
 export async function getCurrentUser() {
@@ -47,20 +47,20 @@ export async function getCurrentUser() {
   return resp;
 }
 
-export async function follow(username) {
-  return client.post(`/user/follow/${username}`);
+export async function follow(uname) {
+  return client.post(`/user/follow/${uname}`);
 }
 
-export async function unfollow(username) {
-  return client.post(`/user/unfollow/${username}`);
+export async function unfollow(uname) {
+  return client.post(`/user/unfollow/${uname}`);
 }
 
-export async function getFollowing(username) {
-  return client.get(`/user/following/${username}`);
+export async function getFollowing(uname) {
+  return client.get(`/user/following/${uname}`);
 }
 
-export async function getFollower(username) {
-  return client.get(`/user/follower/${username}`);
+export async function getFollower(uname) {
+  return client.get(`/user/follower/${uname}`);
 }
 
 export async function newTweet(content) {

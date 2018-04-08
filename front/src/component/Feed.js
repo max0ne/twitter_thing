@@ -34,15 +34,15 @@ class Feed extends Component {
     if (!this.props.match || !this.props.currentUser) {
       return false;
     }
-    return (this.getUserName() === this.props.currentUser.username);
+    return (this.getuname() === this.props.currentUser.uname);
   }
 
   isLoggedIn() {
     return !!this.props.currentUser;
   }
 
-  getUserName() {
-    return this.props.match.params.username;
+  getuname() {
+    return this.props.match.params.uname;
   }
 
   async componentWillMount() {
@@ -54,7 +54,7 @@ class Feed extends Component {
   async reloadTweets() {
     try {
       console.log("this.isCurrentUser()", this.isCurrentUser());
-      const tweets = this.isCurrentUser() ? (await api.getFeed()).data : (await api.getUserTweets(this.getUserName())).data;
+      const tweets = this.isCurrentUser() ? (await api.getFeed()).data : (await api.getUserTweets(this.getuname())).data;
       this.setState({ tweets });
     }
     catch (err) { }
@@ -62,7 +62,7 @@ class Feed extends Component {
 
   async reloadUser() {
     try {
-      const user = (await api.getUser(this.getUserName())).data;
+      const user = (await api.getUser(this.getuname())).data;
       this.setState({ user });
     }
     catch (err) {
@@ -72,7 +72,7 @@ class Feed extends Component {
 
   async reloadFollowers() {
     try {
-      const followers = (await api.getFollower(this.getUserName())).data;
+      const followers = (await api.getFollower(this.getuname())).data;
       this.setState({ followers });
     }
     catch (err) { }
@@ -120,8 +120,8 @@ class Feed extends Component {
   async handleFollowOrUnfollow(isFollow) {
     try {
       await(isFollow ?
-        api.follow(this.getUserName()) :
-        api.unfollow(this.getUserName()));
+        api.follow(this.getuname()) :
+        api.unfollow(this.getuname()));
       util.toast(isFollow ? 'followed' : 'unfollowed');
       this.reloadFollowers();
     }
@@ -140,7 +140,7 @@ class Feed extends Component {
     if (_.isNil(this.state.followers)) {
       return;
     }
-    const alreadyFollowed = !!_.first(this.state.followers, (user) => user.username === this.getUserName());
+    const alreadyFollowed = !!_.first(this.state.followers, (user) => user.uname === this.getuname());
     return (
       <Button icon="like" onClick={() => this.handleFollowOrUnfollow(!alreadyFollowed)}>
         {alreadyFollowed ? "unfollow" : "follow"}
@@ -153,7 +153,7 @@ class Feed extends Component {
       <Header as='h2' icon textAlign='center'>
         <Icon name='users' circular />
         <Header.Content>
-          { this.state.user.username }
+          { this.state.user.uname }
         </Header.Content>
         {
           this.renderFollowButton()
@@ -167,7 +167,7 @@ class Feed extends Component {
       <Header as='h2' icon textAlign='center'>
         <Header.Content>
           <p>🤷</p>
-          {this.getUserName()} not found
+          {this.getuname()} not found
         </Header.Content>
       </Header>
     );

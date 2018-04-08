@@ -11,7 +11,7 @@ class Login extends Component {
   constructor() {
     super();
     this.state = {
-      username: "",
+      uname: "",
       password: "",
     }
 
@@ -32,7 +32,7 @@ class Login extends Component {
         return;
       }
       this.props.dispatch(action.setCurrentUser(user));
-      this.props.history.push(`/feed/${user.username}`);
+      this.props.history.push(`/feed/${user.uname}`);
     }
     catch (err) { }
   }
@@ -41,11 +41,11 @@ class Login extends Component {
     e.preventDefault();
     try {
       const user = (await (isLogin ? 
-        api.login(this.state.username, this.state.password) :
-        api.signup(this.state.username, this.state.password))).data;
+        api.login(this.state.uname, this.state.password) :
+        api.signup(this.state.uname, this.state.password))).data;
       toast(`${isLogin ? 'login' : 'signup'} success`);
       this.props.dispatch(action.setCurrentUser(user));
-      this.props.history.push(`/feed/${user.username}`);
+      this.props.history.push(`/feed/${user.uname}`);
     }
     catch (err) {
       try { toast(err.response.data.status); }
@@ -56,7 +56,7 @@ class Login extends Component {
   handleChange(e, isPassword) {
     e.preventDefault();
     this.setState({
-      [isPassword ? "password" : "username"]: e.target.value,
+      [isPassword ? "password" : "uname"]: e.target.value,
     });
   }
 

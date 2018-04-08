@@ -37,7 +37,7 @@ class Main extends Component {cwm
         <Navbar />
         <Switch>
           <Route path="/login" render={(props) => <Login {...props} />} />
-          <Route path="/feed/:username" render={(props) => <Feed {...props} />} />
+          <Route path="/feed/:uname" render={(props) => <Feed {...props} />} />
         </Switch>
       </div>
     );
