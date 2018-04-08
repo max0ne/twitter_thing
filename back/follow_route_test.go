@@ -4,6 +4,7 @@ import (
 	"net/http"
 	"testing"
 
+	"github.com/max0ne/twitter_thing/back/middleware"
 	"github.com/stretchr/testify/suite"
 )
 
@@ -16,11 +17,14 @@ func TestUserFollow(t *testing.T) {
 }
 
 func (suite *UserFollowTestSuite) TestUserFollow() {
-	var loginCookies []*http.Cookie
-	addLoginCookies := func(req *http.Request) {
-		for _, cok := range loginCookies {
-			req.AddCookie(cok)
+	var token string
+	addToken := func(req *http.Request) {
+		if token != "" {
+			req.Header.Add(middleware.TokenHeader, token)
 		}
+	}
+	storeToken := func(resp *http.Response) {
+		token = resp.Header.Get(middleware.TokenHeader)
 	}
 
 	testcases := []TestCase{
@@ -32,11 +36,9 @@ func (suite *UserFollowTestSuite) TestUserFollow() {
 				"username": "u1",
 				"password": "u1pass",
 			},
-			expCode:    200,
-			expBodyMap: nil,
-			postTestCase: func(resp *http.Response) {
-				loginCookies = resp.Cookies()
-			},
+			expCode:      200,
+			expBodyMap:   nil,
+			postTestCase: storeToken,
 		},
 
 		TestCase{
@@ -118,7 +120,7 @@ func (suite *UserFollowTestSuite) TestUserFollow() {
 			if oldPreTestCase != nil {
 				oldPreTestCase(req)
 			}
-			addLoginCookies(req)
+			addToken(req)
 		}
 		suite.runTestCase(tc)
 	}

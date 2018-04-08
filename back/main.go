@@ -5,7 +5,6 @@ import (
 	"net/http"
 
 	"github.com/gin-contrib/cors"
-	"github.com/gin-contrib/sessions"
 	"github.com/max0ne/twitter_thing/back/db"
 	"github.com/max0ne/twitter_thing/back/middleware"
 	"github.com/max0ne/twitter_thing/back/model"
@@ -39,6 +38,11 @@ type loginParam struct {
 
 type newTweetParam struct {
 	Content string `form:"content" json:"content" binding:"required"`
+}
+
+type loginResponse struct {
+	Username string `json:"username"`
+	Token    string `json:"token"`
 }
 
 func cerr(c *gin.Context, err error) bool {
@@ -85,18 +89,16 @@ func (s *Server) signup(c *gin.Context) {
 		return
 	}
 
-	sess := sessions.Default(c)
-	sess.Set("uname", param.Username)
-	if cerr(c, sess.Save()) {
-		return
-	}
-
-	userInDB, err := model.GetUser(param.Username, s.tables.userTable)
+	token, err := middleware.GenerateJWTToken(param.Username)
 	if cerr(c, err) {
 		return
 	}
 
-	sendObj(c, userInDB)
+	c.Writer.Header().Set(middleware.TokenHeader, token)
+	sendObj(c, loginResponse{
+		Username: param.Username,
+		Token:    token,
+	})
 }
 
 func (s *Server) login(c *gin.Context) {
@@ -120,14 +122,16 @@ func (s *Server) login(c *gin.Context) {
 		return
 	}
 
-	sess := sessions.Default(c)
-	sess.Set("uname", param.Username)
-	if cerr(c, sess.Save()) {
+	token, err := middleware.GenerateJWTToken(param.Username)
+	if cerr(c, err) {
 		return
 	}
 
-	user.Password = ""
-	sendObj(c, user)
+	c.Writer.Header().Set(middleware.TokenHeader, token)
+	sendObj(c, loginResponse{
+		Username: param.Username,
+		Token:    token,
+	})
 }
 
 func (s *Server) unregister(c *gin.Context) {
@@ -278,8 +282,6 @@ func (s *Server) NewRouter() *gin.Engine {
 	router := gin.Default()
 	router.Use(cors.Default())
 
-	cookieStore := sessions.NewCookieStore([]byte("suer_secret_session_secret"))
-	router.Use(sessions.Sessions("ts", cookieStore))
 	router.Use(middleware.InjectUser(s.tables.userTable))
 
 	router.POST("/user/signup", s.signup)

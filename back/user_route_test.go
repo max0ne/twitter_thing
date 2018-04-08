@@ -4,23 +4,27 @@ import (
 	"net/http"
 	"testing"
 
+	"github.com/max0ne/twitter_thing/back/middleware"
 	"github.com/stretchr/testify/suite"
 )
 
-type RegisterTestSuite struct {
+type UserRouteTestSuite struct {
 	RouteTestSuite
 }
 
-func TestUserRegister(t *testing.T) {
-	suite.Run(t, new(RegisterTestSuite))
+func TestUserRoute(t *testing.T) {
+	suite.Run(t, new(UserRouteTestSuite))
 }
 
-func (suite *RegisterTestSuite) TestUserRegister() {
-	var loginCookies []*http.Cookie
-	addLoginCookies := func(req *http.Request) {
-		for _, cok := range loginCookies {
-			req.AddCookie(cok)
+func (suite *UserRouteTestSuite) TestUserRoute() {
+	var token string
+	addToken := func(req *http.Request) {
+		if token != "" {
+			req.Header.Add(middleware.TokenHeader, token)
 		}
+	}
+	storeToken := func(resp *http.Response) {
+		token = resp.Header.Get(middleware.TokenHeader)
 	}
 
 	testcases := []TestCase{
@@ -52,11 +56,9 @@ func (suite *RegisterTestSuite) TestUserRegister() {
 				"username": "u1",
 				"password": "u1pass",
 			},
-			expCode:    200,
-			expBodyMap: nil,
-			postTestCase: func(resp *http.Response) {
-				loginCookies = resp.Cookies()
-			},
+			expCode:      200,
+			expBodyMap:   nil,
+			postTestCase: storeToken,
 		},
 
 		TestCase{
@@ -87,7 +89,7 @@ func (suite *RegisterTestSuite) TestUserRegister() {
 			if oldPreTestCase != nil {
 				oldPreTestCase(req)
 			}
-			addLoginCookies(req)
+			addToken(req)
 		}
 		suite.runTestCase(tc)
 	}

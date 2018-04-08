@@ -4,6 +4,8 @@ import (
 	"net/http"
 	"testing"
 
+	"github.com/max0ne/twitter_thing/back/middleware"
+
 	"github.com/stretchr/testify/suite"
 )
 
@@ -16,11 +18,14 @@ func TestTweet(t *testing.T) {
 }
 
 func (suite *TweetTestSuite) Test() {
-	var loginCookies []*http.Cookie
-	addLoginCookies := func(req *http.Request) {
-		for _, cok := range loginCookies {
-			req.AddCookie(cok)
+	var token string
+	addToken := func(req *http.Request) {
+		if token != "" {
+			req.Header.Add(middleware.TokenHeader, token)
 		}
+	}
+	storeToken := func(resp *http.Response) {
+		token = resp.Header.Get(middleware.TokenHeader)
 	}
 
 	testcases := []TestCase{
@@ -40,10 +45,8 @@ func (suite *TweetTestSuite) Test() {
 				"username": "u1",
 				"password": "u1pass",
 			},
-			expCode: 200,
-			postTestCase: func(resp *http.Response) {
-				loginCookies = resp.Cookies()
-			},
+			expCode:      200,
+			postTestCase: storeToken,
 		},
 
 		TestCase{
@@ -88,10 +91,8 @@ func (suite *TweetTestSuite) Test() {
 				"username": "big_v",
 				"password": "big_vpass",
 			},
-			expCode: 200,
-			postTestCase: func(resp *http.Response) {
-				loginCookies = resp.Cookies()
-			},
+			expCode:      200,
+			postTestCase: storeToken,
 		},
 
 		TestCase{
@@ -142,10 +143,8 @@ func (suite *TweetTestSuite) Test() {
 				"username": "u1",
 				"password": "u1pass",
 			},
-			expCode: 200,
-			postTestCase: func(resp *http.Response) {
-				loginCookies = resp.Cookies()
-			},
+			expCode:      200,
+			postTestCase: storeToken,
 		},
 
 		TestCase{
@@ -168,7 +167,7 @@ func (suite *TweetTestSuite) Test() {
 			if oldPreTestCase != nil {
 				oldPreTestCase(req)
 			}
-			addLoginCookies(req)
+			addToken(req)
 		}
 		suite.runTestCase(tc)
 	}

@@ -1,31 +1,63 @@
 package middleware
 
 import (
+	"fmt"
 	"net/http"
 
-	"github.com/gin-contrib/sessions"
+	jwt "github.com/dgrijalva/jwt-go"
 	"github.com/gin-gonic/gin"
 	"github.com/max0ne/twitter_thing/back/db"
 	"github.com/max0ne/twitter_thing/back/model"
 )
 
-// InjectUser session -> db -> c.Get("user")
+const hmacSecret = "hahahhahah"
+
+// TokenHeader - -
+const TokenHeader = "X-Twitter-Thing-Token"
+
+// GenerateJWTToken - -
+func GenerateJWTToken(uname string) (string, error) {
+	return jwt.NewWithClaims(jwt.SigningMethodHS256, &jwt.StandardClaims{
+		Id: uname,
+	}).SignedString([]byte(hmacSecret))
+}
+
+// InjectUser jwt token -> HMAC validate -> db validate -> c.Get("user")
 func InjectUser(userTable *db.Table) gin.HandlerFunc {
 	return func(c *gin.Context) {
-		sess := sessions.Default(c)
-		uname := sess.Get("uname")
-		if uname == nil {
-			return
-		}
-		username, ok := uname.(string)
-		if !ok {
+		tokenString := c.Request.Header.Get(TokenHeader)
+		if tokenString == "" {
 			return
 		}
 
-		user, _ := model.GetUser(username, userTable)
-		if user != nil {
-			c.Set("user", *user)
+		token, err := jwt.Parse(tokenString, func(token *jwt.Token) (interface{}, error) {
+			// Don't forget to validate the alg is what you expect:
+			if _, ok := token.Method.(*jwt.SigningMethodHMAC); !ok {
+				return nil, fmt.Errorf("Unexpected signing method: %v", token.Header["alg"])
+			}
+			return []byte(hmacSecret), nil
+		})
+
+		if err != nil {
+			fmt.Println(err)
+			return
 		}
+
+		claims, ok := token.Claims.(jwt.MapClaims)
+		if !ok || !token.Valid {
+			fmt.Println("token not valid")
+			return
+		}
+
+		uname, ok := claims["jti"].(string)
+		if !ok {
+			return
+		}
+		user, err := model.GetUser(uname, userTable)
+		if user == nil || err != nil {
+			return
+		}
+		c.Set("user", *user)
 	}
 }
 
