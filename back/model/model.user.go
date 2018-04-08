@@ -10,7 +10,7 @@ import (
 
 // User - -
 type User struct {
-	Uname    string `json:"username"`
+	Uname    string `json:"uname"`
 	Password string `json:"password"`
 }
 

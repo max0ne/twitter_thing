@@ -33,7 +33,7 @@ type globalTables struct {
 }
 
 type loginParam struct {
-	Username string `form:"username" json:"username" binding:"required"`
+	Uname    string `form:"uname" json:"uname" binding:"required"`
 	Password string `form:"password" json:"password" binding:"required"`
 }
 
@@ -42,8 +42,8 @@ type newTweetParam struct {
 }
 
 type loginResponse struct {
-	Username string `json:"username"`
-	Token    string `json:"token"`
+	Uname string `json:"uname"`
+	Token string `json:"token"`
 }
 
 func cerr(c *gin.Context, err error) bool {
@@ -72,10 +72,10 @@ func (s *Server) signup(c *gin.Context) {
 	if c.Bind(&param) != nil {
 		return
 	}
-	fmt.Println(param.Username, param.Password)
+	fmt.Println(param.Uname, param.Password)
 
 	// check whether the user already exists
-	oldUser, err := model.GetUser(param.Username, s.tables.userTable)
+	oldUser, err := model.GetUser(param.Uname, s.tables.userTable)
 	if cerr(c, err) {
 		return
 	}
@@ -85,20 +85,20 @@ func (s *Server) signup(c *gin.Context) {
 		return
 	}
 
-	err = model.SaveUser(model.NewUser(param.Username, param.Password), s.tables.userTable)
+	err = model.SaveUser(model.NewUser(param.Uname, param.Password), s.tables.userTable)
 	if cerr(c, err) {
 		return
 	}
 
-	token, err := middleware.GenerateJWTToken(param.Username)
+	token, err := middleware.GenerateJWTToken(param.Uname)
 	if cerr(c, err) {
 		return
 	}
 
 	c.Writer.Header().Set(middleware.TokenHeader, token)
 	sendObj(c, loginResponse{
-		Username: param.Username,
-		Token:    token,
+		Uname: param.Uname,
+		Token: token,
 	})
 }
 
@@ -108,7 +108,7 @@ func (s *Server) login(c *gin.Context) {
 		return
 	}
 
-	user, err := model.GetUserWithPassword(param.Username, s.tables.userTable)
+	user, err := model.GetUserWithPassword(param.Uname, s.tables.userTable)
 	if cerr(c, err) {
 		return
 	}
@@ -123,15 +123,15 @@ func (s *Server) login(c *gin.Context) {
 		return
 	}
 
-	token, err := middleware.GenerateJWTToken(param.Username)
+	token, err := middleware.GenerateJWTToken(param.Uname)
 	if cerr(c, err) {
 		return
 	}
 
 	c.Writer.Header().Set(middleware.TokenHeader, token)
 	sendObj(c, loginResponse{
-		Username: param.Username,
-		Token:    token,
+		Uname: param.Uname,
+		Token: token,
 	})
 }
 
@@ -144,19 +144,19 @@ func (s *Server) unregister(c *gin.Context) {
 
 	model.DeleteUser(*user, s.tables.userTable)
 	c.JSON(200, gin.H{
-		"status":   "posted",
-		"username": user.Uname,
+		"status": "posted",
+		"uname":  user.Uname,
 	})
 }
 
 func (s *Server) getUser(c *gin.Context) {
-	username := c.Param("username")
-	user, err := model.GetUser(username, s.tables.userTable)
+	uname := c.Param("uname")
+	user, err := model.GetUser(uname, s.tables.userTable)
 	if cerr(c, err) {
 		return
 	}
 	if user == nil {
-		sendErr(c, http.StatusNotFound, fmt.Sprintf("user %s not found", username))
+		sendErr(c, http.StatusNotFound, fmt.Sprintf("user %s not found", uname))
 		return
 	}
 	sendObj(c, *user)
@@ -246,7 +246,7 @@ func (s *Server) getFollower(c *gin.Context) {
 }
 
 func (s *Server) getUserTweets(c *gin.Context) {
-	uname := c.Param("username")
+	uname := c.Param("uname")
 	if uname == "" {
 		sendErr(c, http.StatusBadRequest, "uname required")
 		return
@@ -300,7 +300,7 @@ func (s *Server) NewRouter() *gin.Engine {
 	router.POST("/user/signup", s.signup)
 	router.POST("/user/login", s.login)
 	router.POST("/user/unregister", middleware.RequireLogin, s.unregister)
-	router.GET("/user/get/:username", s.getUser)
+	router.GET("/user/get/:uname", s.getUser)
 	router.GET("/user/me", middleware.RequireLogin, s.getCurrentUser)
 
 	router.POST("/user/follow/:uname", middleware.RequireLogin, s.follow)
@@ -312,7 +312,7 @@ func (s *Server) NewRouter() *gin.Engine {
 	router.POST("/tweet/new", middleware.RequireLogin, s.createNewTweet)
 	router.POST("/tweet/del/:tid", middleware.RequireLogin, s.deleteTweet)
 
-	router.GET("/tweet/user/:username", s.getUserTweets)
+	router.GET("/tweet/user/:uname", s.getUserTweets)
 	router.GET("/tweet/feed", middleware.RequireLogin, s.getFeed)
 
 	if gin.IsDebugging() {

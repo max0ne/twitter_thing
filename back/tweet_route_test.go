@@ -28,6 +28,30 @@ func (suite *TweetTestSuite) Test() {
 		token = resp.Header.Get(middleware.TokenHeader)
 	}
 
+	signInToBigV := TestCase{
+		desc:   "sign in to big v",
+		method: "POST",
+		path:   "/user/login",
+		form: map[string]string{
+			"uname":    "big_v",
+			"password": "big_vpass",
+		},
+		expCode:      200,
+		postTestCase: storeToken,
+	}
+
+	signInToUser := TestCase{
+		desc:   "sign in to user",
+		method: "POST",
+		path:   "/user/login",
+		form: map[string]string{
+			"uname":    "u1",
+			"password": "u1pass",
+		},
+		expCode:      200,
+		postTestCase: storeToken,
+	}
+
 	testcases := []TestCase{
 
 		TestCase{
@@ -42,7 +66,7 @@ func (suite *TweetTestSuite) Test() {
 			method: "POST",
 			path:   "/user/signup",
 			form: map[string]string{
-				"username": "u1",
+				"uname":    "u1",
 				"password": "u1pass",
 			},
 			expCode:      200,
@@ -54,7 +78,7 @@ func (suite *TweetTestSuite) Test() {
 			method: "POST",
 			path:   "/user/signup",
 			form: map[string]string{
-				"username": "big_v",
+				"uname":    "big_v",
 				"password": "big_vpass",
 			},
 			expCode: 200,
@@ -83,17 +107,7 @@ func (suite *TweetTestSuite) Test() {
 			expBodyMapArr: []map[string]string{},
 		},
 
-		TestCase{
-			desc:   "sign in to big v",
-			method: "POST",
-			path:   "/user/login",
-			form: map[string]string{
-				"username": "big_v",
-				"password": "big_vpass",
-			},
-			expCode:      200,
-			postTestCase: storeToken,
-		},
+		signInToBigV,
 
 		TestCase{
 			desc:   "big v post a tweet",
@@ -131,21 +145,12 @@ func (suite *TweetTestSuite) Test() {
 				map[string]string{
 					"tid":     "1",
 					"content": "tweet1",
+					"uname":   "big_v",
 				},
 			},
 		},
 
-		TestCase{
-			desc:   "sign in to user",
-			method: "POST",
-			path:   "/user/login",
-			form: map[string]string{
-				"username": "u1",
-				"password": "u1pass",
-			},
-			expCode:      200,
-			postTestCase: storeToken,
-		},
+		signInToUser,
 
 		TestCase{
 			desc:    "u1's feed should contain the tweet",
@@ -156,8 +161,36 @@ func (suite *TweetTestSuite) Test() {
 				map[string]string{
 					"tid":     "1",
 					"content": "tweet1",
+					"uname":   "big_v",
 				},
 			},
+		},
+
+		signInToBigV,
+
+		TestCase{
+			desc:    "delete this tweet",
+			method:  "POST",
+			path:    "/tweet/del/1",
+			expCode: 200,
+		},
+
+		TestCase{
+			desc:          "no longer see tweet after delete",
+			method:        "GET",
+			path:          "/tweet/feed",
+			expCode:       200,
+			expBodyMapArr: []map[string]string{},
+		},
+
+		signInToUser,
+
+		TestCase{
+			desc:          "no longer see tweet after delete",
+			method:        "GET",
+			path:          "/tweet/feed",
+			expCode:       200,
+			expBodyMapArr: []map[string]string{},
 		},
 	}
 

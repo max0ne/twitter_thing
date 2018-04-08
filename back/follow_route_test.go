@@ -33,7 +33,7 @@ func (suite *UserFollowTestSuite) TestUserFollow() {
 			method: "POST",
 			path:   "/user/signup",
 			form: map[string]string{
-				"username": "u1",
+				"uname":    "u1",
 				"password": "u1pass",
 			},
 			expCode:      200,
@@ -65,7 +65,7 @@ func (suite *UserFollowTestSuite) TestUserFollow() {
 			method: "POST",
 			path:   "/user/signup",
 			form: map[string]string{
-				"username": "big_v",
+				"uname":    "big_v",
 				"password": "big_vpass",
 			},
 			expCode:    200,
@@ -78,7 +78,7 @@ func (suite *UserFollowTestSuite) TestUserFollow() {
 			expCode: 200,
 			expBodyMapArr: []map[string]string{
 				map[string]string{
-					"username": "big_v",
+					"uname": "big_v",
 				},
 			},
 		},
@@ -89,7 +89,7 @@ func (suite *UserFollowTestSuite) TestUserFollow() {
 			expCode: 200,
 			expBodyMapArr: []map[string]string{
 				map[string]string{
-					"username": "u1",
+					"uname": "u1",
 				},
 			},
 		},

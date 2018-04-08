@@ -32,7 +32,7 @@ func (suite *UserRouteTestSuite) TestUserRoute() {
 			method: "POST",
 			path:   "/user/login",
 			form: map[string]string{
-				"username": "u1",
+				"uname": "u1",
 				"password": "u1pass",
 			},
 			expCode:    401,
@@ -43,7 +43,7 @@ func (suite *UserRouteTestSuite) TestUserRoute() {
 			method: "POST",
 			path:   "/user/login",
 			form: map[string]string{
-				"username": "u1",
+				"uname": "u1",
 			},
 			expCode:    400,
 			expBodyMap: nil,
@@ -53,7 +53,7 @@ func (suite *UserRouteTestSuite) TestUserRoute() {
 			method: "POST",
 			path:   "/user/signup",
 			form: map[string]string{
-				"username": "u1",
+				"uname": "u1",
 				"password": "u1pass",
 			},
 			expCode:      200,
@@ -66,7 +66,7 @@ func (suite *UserRouteTestSuite) TestUserRoute() {
 			path:    "/user/get/u1",
 			expCode: 200,
 			expBodyMap: map[string]string{
-				"username": "u1",
+				"uname": "u1",
 			},
 		},
 
