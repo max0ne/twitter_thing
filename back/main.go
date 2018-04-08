@@ -162,6 +162,12 @@ func (s *Server) getUser(c *gin.Context) {
 }
 
 func (s *Server) getCurrentUser(c *gin.Context) {
+	token, err := middleware.GenerateJWTToken((*middleware.GetUser(c)).Uname)
+	if cerr(c, err) {
+		return
+	}
+
+	c.Writer.Header().Set(middleware.TokenHeader, token)
 	sendObj(c, *middleware.GetUser(c))
 }
 
