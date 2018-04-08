@@ -1,4 +1,13 @@
+.feed-container {
+  max-width: 1000px;
+  display: flex;
+  flex-flow: row;
+  justify-content: center;
+  width: 100%;
+}
+
 .feed-main {
   display: flex;
   flex-flow: column;
+  /* flex: 1; */
 }

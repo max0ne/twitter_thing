@@ -1,6 +1,6 @@
 import React, { Component } from 'react';
 import { Form, TextArea, Button, Header, Icon, Dimmer, Loader } from 'semantic-ui-react';
-import * as _ from 'lodash';
+import _ from 'lodash';
 
 import '../css/Feed.css';
 
@@ -8,7 +8,7 @@ import TweetTable from './TweetTable';
 
 import store from '../common/store';
 import * as api from '../common/api';
-import { toast } from 'react-toastify';
+import * as util from '../common/util';
 
 class Feed extends Component {
   constructor() {
@@ -79,7 +79,7 @@ class Feed extends Component {
     e.preventDefault();
 
     if (this.state.newTweetContent.length === 0) {
-      toast(`empty`);
+      util.toast(`empty`);
       return;
     }
 
@@ -91,10 +91,10 @@ class Feed extends Component {
         posting: false,
         newTweetContent: '',
       });
-      toast('👌');
+      util.toast('👌');
     }
     catch (err) {
-      toast((err.response && err.response.body && err.response.body.status) || err.toString());
+      util.toastError(err);
     }
   }
 
@@ -115,7 +115,7 @@ class Feed extends Component {
       await(isFollow ?
         api.follow(this.props.match.params.username) :
         api.unfollow(this.props.match.params.username));
-      toast(isFollow ? 'followed' : 'unfollowed');
+      util.toast(isFollow ? 'followed' : 'unfollowed');
       this.reloadFollowers();
     }
     catch (err) {
@@ -176,17 +176,19 @@ class Feed extends Component {
 
   render() {
     return (
-      <div className="feed-main">
-        {
-          this.state.user ? this.renderUserBox() :
-          this.state.userNotFound ? this.renderUserNotFound() :
-          this.renderUserLoading()
-        }
-        {
-          this.isCurrentUser() && this.postNewTweetBox()
-        }
-        <TweetTable tweets={this.state.tweets}>
-        </TweetTable>
+      <div className="feed-container">
+        <div className="feed-main">
+          {
+            this.state.user ? this.renderUserBox() :
+              this.state.userNotFound ? this.renderUserNotFound() :
+                this.renderUserLoading()
+          }
+          {
+            this.isCurrentUser() && this.postNewTweetBox()
+          }
+          <TweetTable tweets={this.state.tweets}>
+          </TweetTable>
+        </div>
       </div>
     );
   }
