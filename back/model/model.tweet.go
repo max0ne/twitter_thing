@@ -98,7 +98,7 @@ func PublishNewTweet(tweet *Tweet, followerTable, tweetTable, bucketTable, poste
 		if len(follower) == 0 {
 			continue
 		}
-		buckets, err := getBucket(tweet.Uname, bucketTable)
+		buckets, err := getBucket(follower, bucketTable)
 		if err != nil {
 			fmt.Println(err)
 			continue
@@ -149,7 +149,9 @@ func GetUserFeed(uname string, tweetTable, bucketTable *db.Table) ([]Tweet, erro
 	}
 
 	tweets := []Tweet{}
-	for _, tb := range tbs {
+	// reverse iterate bucket
+	for idx := len(tbs) - 1; idx >= 0; idx-- {
+		tb := tbs[idx]
 		tweet, err := GetTweet(tb.Tid, tweetTable)
 		if tweet == nil || err != nil {
 			continue

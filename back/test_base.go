@@ -22,7 +22,7 @@ type TestCase struct {
 	expBodyMap    map[string]string
 	expBodyMapArr []map[string]string
 	preTestCase   func(req *http.Request)
-	postTestCase  func(resp *http.Response)
+	postTestCase  func(resp *http.Response, bodyString string)
 }
 
 // RouteTestSuite test http route base suite
@@ -63,10 +63,10 @@ func (suite *RouteTestSuite) testGET(tc TestCase) {
 	resp, err := http.DefaultClient.Do(req)
 	suite.Require().NoError(err)
 
-	suite.assertResponse(tc, resp)
+	bodyString := suite.assertResponse(tc, resp)
 
 	if tc.postTestCase != nil {
-		tc.postTestCase(resp)
+		tc.postTestCase(resp, bodyString)
 	}
 }
 
@@ -87,14 +87,15 @@ func (suite *RouteTestSuite) testPOST(tc TestCase) {
 	resp, err := http.DefaultClient.Do(req)
 	suite.Require().NoError(err)
 
-	suite.assertResponse(tc, resp)
+	bodyString := suite.assertResponse(tc, resp)
 
 	if tc.postTestCase != nil {
-		tc.postTestCase(resp)
+		tc.postTestCase(resp, bodyString)
 	}
 }
 
-func (suite *RouteTestSuite) assertResponse(tc TestCase, resp *http.Response) {
+// returns body string
+func (suite *RouteTestSuite) assertResponse(tc TestCase, resp *http.Response) string {
 	bodyBytes, err := ioutil.ReadAll(resp.Body)
 	suite.Require().NoError(err)
 	bodyString := string(bodyBytes)
@@ -112,7 +113,7 @@ func (suite *RouteTestSuite) assertResponse(tc TestCase, resp *http.Response) {
 	}
 
 	if tc.expBodyMapArr != nil {
-		errorMsg := fmt.Sprintf("%s: %s %s %s", tc.method, tc.path, bodyString, util.JSONMarshel(tc.expBodyMapArr))
+		errorMsg := fmt.Sprintf("%s: %s \nexpected: %s\ngot: %s", tc.method, tc.path, util.JSONMarshel(tc.expBodyMapArr), bodyString)
 
 		bodyAsMapArr := []map[string]string{}
 		suite.Require().NoError(json.Unmarshal(bodyBytes, &bodyAsMapArr), errorMsg)
@@ -123,4 +124,6 @@ func (suite *RouteTestSuite) assertResponse(tc TestCase, resp *http.Response) {
 			}
 		}
 	}
+
+	return bodyString
 }

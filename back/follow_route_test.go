@@ -23,7 +23,7 @@ func (suite *UserFollowTestSuite) TestUserFollow() {
 			req.Header.Add(middleware.TokenHeader, token)
 		}
 	}
-	storeToken := func(resp *http.Response) {
+	storeToken := func(resp *http.Response, bodyString string) {
 		token = resp.Header.Get(middleware.TokenHeader)
 	}
 
