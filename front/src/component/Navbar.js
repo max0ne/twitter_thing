@@ -1,10 +1,12 @@
 import React, { Component } from 'react'
+import { connect } from 'react-redux'
+
 import { Menu } from 'semantic-ui-react'
 import { Link } from 'react-router-dom';
 
 import _ from 'lodash';
 
-export default class MenuExampleMenus extends Component {
+class Navbar extends Component {
   render() {
     return (
       <Menu>
@@ -14,10 +16,10 @@ export default class MenuExampleMenus extends Component {
 
         <Menu.Menu position='right'>
         {
-            _.isNil(this.props.user) ? (
+            _.isNil(this.props.currentUser) ? (
               <Menu.Item name='signup' as={Link} to={`/login`}>Login</Menu.Item>
             ) : (
-              <Menu.Item name='me' as={Link} to={`/feed/${this.props.user.username}`}>{this.props.user.username}</Menu.Item>
+                <Menu.Item name='me' as={Link} to={`/feed/${this.props.currentUser.username}`}>{this.props.currentUser.username}</Menu.Item>
             )
         }
         </Menu.Menu>
@@ -25,3 +27,9 @@ export default class MenuExampleMenus extends Component {
     )
   }
 }
+
+const mapStateToProps = (state) => ({
+  currentUser: state.currentUser,
+});
+
+export default connect(mapStateToProps)(Navbar);

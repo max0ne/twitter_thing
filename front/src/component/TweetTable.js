@@ -1,10 +1,11 @@
 import React, { Component } from 'react';
+import { connect } from 'react-redux'
+
 import { Feed, Popup, Button } from 'semantic-ui-react';
 import _ from 'lodash';
 import { Link } from 'react-router-dom';
 import * as util from '../common/util';
 
-import store from '../common/store';
 import * as api from '../common/api';
 
 class TweetTable extends Component {
@@ -20,7 +21,7 @@ class TweetTable extends Component {
   }
 
   renderDeleteTweetBox(tweet) {
-    const username = store.currentUser && store.currentUser.username;
+    const username = this.props.currentUser && this.props.currentUser.username;
     if (_.isNil(username)) {
       return;
     }
@@ -55,4 +56,8 @@ class TweetTable extends Component {
   }
 }
 
-export default TweetTable;
+const mapStateToProps = (state) => ({
+  currentUser: state.currentUser,
+});
+
+export default connect()(TweetTable);

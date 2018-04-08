@@ -1,4 +1,8 @@
 import React, { Component } from 'react';
+import { connect } from 'react-redux'
+
+import * as action from '../redux/action';
+import * as api from '../common/api';
 
 import {
   Switch,
@@ -8,27 +12,31 @@ import {
 import Navbar from './Navbar';
 import Feed from './Feed';
 import Login from './Login';
-import store from '../common/store';
 
-class Main extends Component {
-  constructor() {
-    super();
-    this.state = { user: undefined };
-    this.handleLoggedIn = this.handleLoggedIn.bind(this);
-  }
+class Main extends Component {cwm
+  
+  async componentWillMount() {
+    try {
+      const token = window.localStorage.getItem(api.TokenHeader);
+      if (!token) {
+        return;
+      }
+      api.client.defaults.headers[api.TokenHeader] = token;
 
-  handleLoggedIn(user) {
-    store.currentUser = user;
-    this.setState({ user });
-    this.props.history.push(`/feed/${user.username}`);
+      const user = (await api.getCurrentUser()).data;
+      if (user) {
+        this.props.dispatch(action.setCurrentUser(user));
+      }
+    }
+    catch (err) { }
   }
 
   render() {
     return (
       <div>
-        <Navbar user={this.state.user} />
+        <Navbar />
         <Switch>
-          <Route path="/login" render={(props) => <Login {...props} onLogin={this.handleLoggedIn} />} />
+          <Route path="/login" render={(props) => <Login {...props} />} />
           <Route path="/feed/:username" render={(props) => <Feed {...props} />} />
         </Switch>
       </div>
@@ -36,4 +44,8 @@ class Main extends Component {
   }
 }
 
-export default Main;
+const mapStateToProps = (state) => ({
+  currentUser: state.currentUser,
+});
+
+export default connect()(Main);

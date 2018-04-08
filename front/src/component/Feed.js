@@ -1,4 +1,6 @@
 import React, { Component } from 'react';
+import { connect } from 'react-redux'
+
 import { Form, TextArea, Button, Header, Icon, Dimmer, Loader } from 'semantic-ui-react';
 import _ from 'lodash';
 
@@ -6,7 +8,6 @@ import '../css/Feed.css';
 
 import TweetTable from './TweetTable';
 
-import store from '../common/store';
 import * as api from '../common/api';
 import * as util from '../common/util';
 
@@ -30,14 +31,14 @@ class Feed extends Component {
   }
 
   isCurrentUser() {    
-    if (!this.props.match || !store.currentUser) {
+    if (!this.props.match || !this.props.currentUser) {
       return false;
     }
-    return (this.props.match.params.username === store.currentUser.username);
+    return (this.props.match.params.username === this.props.currentUser.username);
   }
 
   isLoggedIn() {
-    return !!store.currentUser;
+    return !!this.props.currentUser;
   }
 
   componentWillMount() {
@@ -194,4 +195,8 @@ class Feed extends Component {
   }
 }
 
-export default Feed;
+const mapStateToProps = (state) => ({
+  currentUser: state.currentUser,
+});
+
+export default connect(mapStateToProps)(Feed);

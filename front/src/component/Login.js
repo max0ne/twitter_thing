@@ -1,9 +1,11 @@
 import React, { Component } from 'react';
+import { connect } from 'react-redux'
 
 import { Button, Input } from 'semantic-ui-react';
 import { toast } from 'react-toastify';
 
 import * as api from '../common/api';
+import * as action from '../redux/action';
 
 class Login extends Component {
   constructor() {
@@ -29,7 +31,8 @@ class Login extends Component {
       if (!user) {
         return;
       }
-      this.props.onLogin(user);
+      this.props.dispatch(action.setCurrentUser(user));
+      this.props.history.push(`/feed/${user.username}`);
     }
     catch (err) { }
   }
@@ -41,7 +44,8 @@ class Login extends Component {
         api.login(this.state.username, this.state.password) :
         api.signup(this.state.username, this.state.password))).data;
       toast(`${isLogin ? 'login' : 'signup'} success`);
-      this.props.onLogin(user);
+      this.props.dispatch(action.setCurrentUser(user));
+      this.props.history.push(`/feed/${user.username}`);
     }
     catch (err) {
       try { toast(err.response.data.status); }
@@ -88,4 +92,4 @@ class Login extends Component {
   }
 }
 
-export default Login;
+export default connect()(Login);
