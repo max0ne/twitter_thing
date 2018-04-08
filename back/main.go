@@ -143,6 +143,7 @@ func (s *Server) unregister(c *gin.Context) {
 	}
 
 	model.DeleteUser(*user, s.tables.userTable)
+	model.DeleteAllUsersTweet(user.Uname, s.tables.tweetTable, s.tables.postedByTable)
 	c.JSON(200, gin.H{
 		"status": "posted",
 		"uname":  user.Uname,

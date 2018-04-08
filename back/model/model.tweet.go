@@ -162,3 +162,11 @@ func GetUserFeed(uname string, tweetTable, bucketTable *db.Table) ([]Tweet, erro
 	}
 	return tweets, nil
 }
+
+// DeleteAllUsersTweet delete all user's  tweet
+func DeleteAllUsersTweet(vname string, tweetTable, postedByTable *db.Table) {
+	tids := getPostedBy(vname, postedByTable)
+	for _, tid := range tids {
+		DelTweet(tid, tweetTable)
+	}
+}

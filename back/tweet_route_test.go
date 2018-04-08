@@ -289,6 +289,14 @@ func (suite *TweetTestSuite) TestPostNewAfterFollow() {
 		postTestCase: storeToken,
 	}
 
+	unregisterUser := TestCase{
+		desc:         "unregister",
+		method:       "POST",
+		path:         "/user/unregister",
+		expCode:      200,
+		postTestCase: storeToken,
+	}
+
 	testcases := []TestCase{
 
 		TestCase{
@@ -413,6 +421,29 @@ func (suite *TweetTestSuite) TestPostNewAfterFollow() {
 					"tid":     "3",
 					"uname":   "big_v",
 				},
+				map[string]string{
+					"content": "t2",
+					"tid":     "2",
+					"uname":   "u1",
+				},
+				map[string]string{
+					"content": "t1",
+					"tid":     "1",
+					"uname":   "u1",
+				},
+			},
+		},
+
+		signInToBigV,
+		unregisterUser,
+		signInToUser,
+
+		TestCase{
+			desc:    "user no longer see big v's tweet after big v unregistered",
+			method:  "GET",
+			path:    "/tweet/feed",
+			expCode: 200,
+			expBodyMapArr: []map[string]string{
 				map[string]string{
 					"content": "t2",
 					"tid":     "2",
