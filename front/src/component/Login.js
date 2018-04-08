@@ -2,7 +2,7 @@ import React, { Component } from 'react';
 import { connect } from 'react-redux'
 
 import { Button, Input } from 'semantic-ui-react';
-import { toast } from 'react-toastify';
+import * as util from '../common/util';
 
 import * as api from '../common/api';
 import * as action from '../redux/action';
@@ -25,13 +25,11 @@ class Login extends Component {
       const user = (await (isLogin ? 
         api.login(this.state.uname, this.state.password) :
         api.signup(this.state.uname, this.state.password))).data;
-      toast(`${isLogin ? 'login' : 'signup'} success`);
       this.props.dispatch(action.setCurrentUser(user));
       this.props.history.push(`/feed/${user.uname}`);
     }
     catch (err) {
-      try { toast(err.response.data.status); }
-      catch (_) { toast(err.toString()); }
+      util.toastError(err);
     }
   }
 
