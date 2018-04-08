@@ -19,14 +19,20 @@ class Login extends Component {
 
   async componentWillMount() {
     try {
-      const user = await api.getCurrentUser();
-      if (user) {
-        setTimeout(this.props.onLogin.bind(undefined, user), 100);
+      const token = window.localStorage.getItem(api.TokenHeader);
+      if (!token) {
+        return;
       }
+      api.client.defaults.headers[api.TokenHeader] = token;
+
+      const user = (await api.getCurrentUser()).data;
+      if (!user) {
+        return;
+      }
+      this.props.onLogin(user);
     }
     catch (err) { }
   }
-  
 
   async handleLoginOrSignup(e, isLogin) {
     e.preventDefault();
