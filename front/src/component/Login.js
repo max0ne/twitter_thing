@@ -19,24 +19,6 @@ class Login extends Component {
     this.handleChange = this.handleChange.bind(this);
   }
 
-  async componentWillMount() {
-    try {
-      const token = window.localStorage.getItem(api.TokenHeader);
-      if (!token) {
-        return;
-      }
-      api.client.defaults.headers[api.TokenHeader] = token;
-
-      const user = (await api.getCurrentUser()).data;
-      if (!user) {
-        return;
-      }
-      this.props.dispatch(action.setCurrentUser(user));
-      this.props.history.push(`/feed/${user.uname}`);
-    }
-    catch (err) { }
-  }
-
   async handleLoginOrSignup(e, isLogin) {
     e.preventDefault();
     try {

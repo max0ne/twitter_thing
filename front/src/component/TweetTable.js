@@ -1,7 +1,7 @@
 import React, { Component } from 'react';
 import { connect } from 'react-redux'
 
-import { Feed, Popup, Button } from 'semantic-ui-react';
+import { Feed, Popup, Button, Icon } from 'semantic-ui-react';
 import _ from 'lodash';
 import { Link } from 'react-router-dom';
 import * as util from '../common/util';
@@ -21,7 +21,7 @@ class TweetItem extends Component {
         flowing
         on='click'
       >
-        <Button icon="trash" onClick={this.props.onDelete.bind(undefined, tweet)}>Delete</Button>
+        <Button onClick={this.props.onDelete.bind(undefined, tweet)}><Icon trash/></Button>
       </Popup>
     );
   }
@@ -69,7 +69,7 @@ class TweetTable extends Component {
       return uname === tweet.uname;
     })();
     return (
-      <TweetItem tweet={tweet} shouldRenderOptions={shouldRenderOptions} onDelete={this.deleteTweet.bind(this, tweet)} />
+      <TweetItem key={tweet.tid} tweet={tweet} shouldRenderOptions={shouldRenderOptions} onDelete={this.deleteTweet.bind(this, tweet)} />
     );
   }
 

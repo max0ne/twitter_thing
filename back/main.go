@@ -169,7 +169,10 @@ func (s *Server) getCurrentUser(c *gin.Context) {
 	}
 
 	c.Writer.Header().Set(middleware.TokenHeader, token)
-	sendObj(c, *middleware.GetUser(c))
+	sendObj(c, loginResponse{
+		Uname: (*middleware.GetUser(c)).Uname,
+		Token: token,
+	})
 }
 
 func (s *Server) createNewTweet(c *gin.Context) {

@@ -5,20 +5,16 @@ export const client = axios.create({
   baseURL: config.apiBaseURL,
 });
 
-export const TokenHeader = "Authorization";
-const storeTokenIfPresent = (resp) => {
-  const token = resp && resp.data && resp.data.token;
-  if (token) {
-    window.localStorage.setItem(TokenHeader, token);
-    client.defaults.headers[TokenHeader] = token;
-  }
+const TokenHeader = "Authorization";
+
+export const setToken = (token) => {
+  client.defaults.headers[TokenHeader] = token;
 }
 
 export async function signup(uname, password) {
   const resp = await client.post('/user/signup', {
     uname, password,
   });
-  storeTokenIfPresent(resp);
   return resp;
 }
 
@@ -26,8 +22,6 @@ export async function login(uname, password) {
   const resp = await client.post('/user/login', {
     uname, password,
   });
-
-  storeTokenIfPresent(resp);
   return resp;
 }
 
@@ -43,7 +37,6 @@ export async function getUser(uname) {
 
 export async function getCurrentUser() {
   const resp = await client.get(`/user/me`);
-  storeTokenIfPresent(resp);
   return resp;
 }
 

@@ -13,16 +13,14 @@ import Navbar from './Navbar';
 import Feed from './Feed';
 import Login from './Login';
 
-class Main extends Component {cwm
+import * as setTokenMiddleware from '../redux/setTokenMiddleware';
+
+class Main extends Component {
   
   async componentWillMount() {
-    try {
-      const token = window.localStorage.getItem(api.TokenHeader);
-      if (!token) {
-        return;
-      }
-      api.client.defaults.headers[api.TokenHeader] = token;
 
+    try {
+      setTokenMiddleware.loadTokenFromLocalStorage();
       const user = (await api.getCurrentUser()).data;
       if (user) {
         this.props.dispatch(action.setCurrentUser(user));
@@ -48,4 +46,4 @@ const mapStateToProps = (state) => ({
   currentUser: state.currentUser,
 });
 
-export default connect()(Main);
+export default connect(mapStateToProps)(Main);
