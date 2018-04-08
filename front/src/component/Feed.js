@@ -26,6 +26,7 @@ class Feed extends Component {
 
     this.handleNewTweetChange = this.handleNewTweetChange.bind(this);
     this.handleSendNewTweet = this.handleSendNewTweet.bind(this);
+    this.handleTweetDeleted = this.handleTweetDeleted.bind(this);
     this.isCurrentUser = this.isCurrentUser.bind(this);
     this.reloadTweets = this.reloadTweets.bind(this);
   }
@@ -130,6 +131,12 @@ class Feed extends Component {
     this.reloadFollowers();
   }
 
+  handleTweetDeleted(tweet) {
+    this.setState({
+      tweets: this.state.tweets.filter((tt) => tt !== tweet)
+    });
+  }
+
   renderFollowButton() {
     if (!this.isLoggedIn()) {
       return;
@@ -193,7 +200,7 @@ class Feed extends Component {
           {
             this.isCurrentUser() && this.postNewTweetBox()
           }
-          <TweetTable tweets={this.state.tweets}>
+          <TweetTable tweets={this.state.tweets} tweetDeleted={this.handleTweetDeleted}>
           </TweetTable>
         </div>
       </div>
