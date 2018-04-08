@@ -132,7 +132,9 @@ func UnfollowUserTweet(user User, vname string, bucketTable *db.Table) error {
 func GetUserTweets(vname string, tweetTable, postedByTable *db.Table) []Tweet {
 	tids := getPostedBy(vname, postedByTable)
 	tweets := []Tweet{}
-	for _, tid := range tids {
+	// reverse iterate bucket
+	for idx := len(tids) - 1; idx >= 0; idx-- {
+		tid := tids[idx]
 		tweet, err := GetTweet(tid, tweetTable)
 		if tweet != nil && err == nil {
 			tweets = append(tweets, *tweet)
