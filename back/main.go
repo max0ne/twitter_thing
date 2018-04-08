@@ -3,6 +3,7 @@ package main
 import (
 	"fmt"
 	"net/http"
+	"time"
 
 	"github.com/gin-contrib/cors"
 	"github.com/max0ne/twitter_thing/back/db"
@@ -286,7 +287,13 @@ func NewServer() Server {
 // NewRouter make a router
 func (s *Server) NewRouter() *gin.Engine {
 	router := gin.Default()
-	router.Use(cors.Default())
+	router.Use(cors.New(cors.Config{
+		AllowMethods:     []string{"GET", "POST", "PUT", "HEAD"},
+		AllowHeaders:     []string{"Origin", "Content-Length", "Content-Type", middleware.TokenHeader},
+		AllowCredentials: false,
+		AllowAllOrigins:  true,
+		MaxAge:           12 * time.Hour,
+	}))
 
 	router.Use(middleware.InjectUser(s.tables.userTable))
 

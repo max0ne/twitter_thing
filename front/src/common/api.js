@@ -1,24 +1,40 @@
 import axios from 'axios';
 import config from '../config';
 
-const client = axios.create({
+export const client = axios.create({
   baseURL: config.apiBaseURL,
 });
 
+export const TokenHeader = "Authorization";
+const storeTokenIfPresent = (resp) => {
+  const token = resp && resp.data && resp.data.token;
+  if (token) {
+    window.localStorage.setItem(TokenHeader, token);
+    client.defaults.headers[TokenHeader] = token;
+  }
+}
+
 export async function signup(username, password) {
-  return client.post('/user/signup', {
+  const resp = await client.post('/user/signup', {
     username, password,
   });
+  storeTokenIfPresent(resp);
+  return resp;
 }
 
 export async function login(username, password) {
-  return client.post('/user/login', {
+  const resp = await client.post('/user/login', {
     username, password,
   });
+
+  storeTokenIfPresent(resp);
+  return resp;
 }
 
 export async function unregister() {
-  return client.post('/user/unregister');
+  const resp = await client.post('/user/unregister');
+  client.defaults.headers[TokenHeader] = undefined;
+  return resp;
 }
 
 export async function getUser(username) {
@@ -26,7 +42,9 @@ export async function getUser(username) {
 }
 
 export async function getCurrentUser() {
-  return client.get(`/user/me`);
+  const resp = await client.get(`/user/me`);
+  storeTokenIfPresent(resp);
+  return resp;
 }
 
 export async function follow(username) {

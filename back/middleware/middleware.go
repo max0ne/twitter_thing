@@ -13,7 +13,7 @@ import (
 const hmacSecret = "hahahhahah"
 
 // TokenHeader - -
-const TokenHeader = "X-Twitter-Thing-Token"
+const TokenHeader = "Authorization"
 
 // GenerateJWTToken - -
 func GenerateJWTToken(uname string) (string, error) {
