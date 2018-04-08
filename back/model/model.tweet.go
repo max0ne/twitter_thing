@@ -29,6 +29,9 @@ func NewTweet(uname, content string) Tweet {
 // GetTweet - -
 func GetTweet(tid string, table *db.Table) (*Tweet, error) {
 	var tweet Tweet
+	if !table.Has(tid) {
+		return nil, nil
+	}
 	if err := json.Unmarshal([]byte(table.Get(tid)), &tweet); err != nil {
 		return nil, err
 	}

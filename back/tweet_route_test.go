@@ -469,3 +469,47 @@ func (suite *TweetTestSuite) TestPostNewAfterFollow() {
 		suite.runTestCase(tc)
 	}
 }
+
+func (suite *TweetTestSuite) TestDeleteNonExistTweet() {
+	var token string
+	addToken := func(req *http.Request) {
+		if token != "" {
+			req.Header.Add(middleware.TokenHeader, token)
+		}
+	}
+	storeToken := func(resp *http.Response, bodyString string) {
+		token = resp.Header.Get(middleware.TokenHeader)
+	}
+
+	testcases := []TestCase{
+
+		TestCase{
+			desc:   "signup a user",
+			method: "POST",
+			path:   "/user/signup",
+			form: map[string]string{
+				"uname":    "u1",
+				"password": "u1pass",
+			},
+			expCode:      200,
+			postTestCase: storeToken,
+		},
+		TestCase{
+			desc:    "delete this tweet",
+			method:  "POST",
+			path:    "/tweet/del/nonexisttweetid",
+			expCode: 404,
+		},
+	}
+
+	for _, tc := range testcases {
+		oldPreTestCase := tc.preTestCase
+		tc.preTestCase = func(req *http.Request) {
+			if oldPreTestCase != nil {
+				oldPreTestCase(req)
+			}
+			addToken(req)
+		}
+		suite.runTestCase(tc)
+	}
+}

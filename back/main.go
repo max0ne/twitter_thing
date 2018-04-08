@@ -198,6 +198,9 @@ func (s *Server) deleteTweet(c *gin.Context) {
 	if cerr(c, err) {
 		return
 	}
+	if tweet == nil {
+		sendErr(c, http.StatusNotFound, "tweet not exist "+tid)
+	}
 
 	if tweet.Uname != user.Uname {
 		sendErr(c, http.StatusUnauthorized, user.Uname+" you are not "+tweet.Uname)
