@@ -67,6 +67,7 @@ func (s *Server) signup(c *gin.Context) {
 	if c.Bind(&param) != nil {
 		return
 	}
+	fmt.Println(param.Username, param.Password)
 
 	// check whether the user already exists
 	oldUser, err := model.GetUser(param.Username, s.tables.userTable)
@@ -90,10 +91,12 @@ func (s *Server) signup(c *gin.Context) {
 		return
 	}
 
-	c.JSON(200, gin.H{
-		"status":   "posted",
-		"username": param.Username,
-	})
+	userInDB, err := model.GetUser(param.Username, s.tables.userTable)
+	if cerr(c, err) {
+		return
+	}
+
+	sendObj(c, userInDB)
 }
 
 func (s *Server) login(c *gin.Context) {
@@ -123,10 +126,8 @@ func (s *Server) login(c *gin.Context) {
 		return
 	}
 
-	c.JSON(200, gin.H{
-		"status":   "posted",
-		"username": param.Username,
-	})
+	user.Password = ""
+	sendObj(c, user)
 }
 
 func (s *Server) unregister(c *gin.Context) {
@@ -154,6 +155,10 @@ func (s *Server) getUser(c *gin.Context) {
 		return
 	}
 	sendObj(c, *user)
+}
+
+func (s *Server) getCurrentUser(c *gin.Context) {
+	sendObj(c, *middleware.GetUser(c))
 }
 
 func (s *Server) createNewTweet(c *gin.Context) {
@@ -281,6 +286,7 @@ func (s *Server) NewRouter() *gin.Engine {
 	router.POST("/user/login", s.login)
 	router.POST("/user/unregister", middleware.RequireLogin, s.unregister)
 	router.GET("/user/get/:username", s.getUser)
+	router.GET("/user/me", middleware.RequireLogin, s.getCurrentUser)
 
 	router.POST("/user/follow/:uname", middleware.RequireLogin, s.follow)
 	router.POST("/user/unfollow/:uname", middleware.RequireLogin, s.unfollow)
