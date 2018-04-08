@@ -38,7 +38,7 @@ export async function unregister() {
 }
 
 export async function getUser(username) {
-  return client.get(`/user/unregister/${username}`);
+  return client.get(`/user/get/${username}`);
 }
 
 export async function getCurrentUser() {

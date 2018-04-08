@@ -1,9 +1,12 @@
 import React, { Component } from 'react';
-import { Form, TextArea, Button } from 'semantic-ui-react';
+import { Form, TextArea, Button, Header, Icon, Dimmer, Loader } from 'semantic-ui-react';
+import * as _ from 'lodash';
+
 import '../css/Feed.css';
 
 import TweetTable from './TweetTable';
 
+import store from '../common/store';
 import * as api from '../common/api';
 import { toast } from 'react-toastify';
 
@@ -12,6 +15,10 @@ class Feed extends Component {
     super();
     this.state = {
       tweets: [],
+      user: undefined,
+      followers: undefined,
+
+      userNotFound: false,
       newTweetContent: "",
       posting: false,
     };
@@ -23,20 +30,43 @@ class Feed extends Component {
   }
 
   isCurrentUser() {    
-    if (!this.props.match || !this.props.currentUser) {
+    if (!this.props.match || !store.currentUser) {
       return false;
     }
-    return (this.props.match.params.username === this.props.currentUser.username);
+    return (this.props.match.params.username === store.currentUser.username);
+  }
+
+  isLoggedIn() {
+    return !!store.currentUser;
   }
 
   componentWillMount() {
     this.reloadTweets();
+    this.reloadUser();
   }
 
   async reloadTweets() {
     try {
-      const tweets = (await api.getFeed()).data;
+      const tweets = this.isCurrentUser() ? (await api.getFeed()).data : (await api.getUserTweets(this.props.match.params.username)).data;
       this.setState({ tweets });
+    }
+    catch (err) { }
+  }
+
+  async reloadUser() {
+    try {
+      const user = (await api.getUser(this.props.match.params.username)).data;
+      this.setState({ user });
+    }
+    catch (err) {
+      this.setState({ userNotFound: true });
+    }
+  }
+
+  async reloadFollowers() {
+    try {
+      const followers = (await api.getFollower(this.props.match.params.username)).data;
+      this.setState({ followers });
     }
     catch (err) { }
   }
@@ -80,9 +110,78 @@ class Feed extends Component {
       );
   }
 
+  async handleFollowOrUnfollow(isFollow) {
+    try {
+      await(isFollow ?
+        api.follow(this.props.match.params.username) :
+        api.unfollow(this.props.match.params.username));
+      toast(isFollow ? 'followed' : 'unfollowed');
+      this.reloadFollowers();
+    }
+    catch (err) {
+    }
+    this.reloadFollowers();
+  }
+
+  renderFollowButton() {
+    if (!this.isLoggedIn()) {
+      return;
+    }
+    if (this.isCurrentUser()) {
+      return;
+    }
+    if (_.isNil(this.state.followers)) {
+      return;
+    }
+    const alreadyFollowed = this.state.followers.indexOf(this.props.match.params.username);
+    return (
+      <Button icon="like" onClick={() => this.handleFollowOrUnfollow(!alreadyFollowed)}>
+        {alreadyFollowed ? "unfollow" : "follow"}
+      </Button>
+    );
+  }
+
+  renderUserBox() {
+    return (
+      <Header as='h2' icon textAlign='center'>
+        <Icon name='users' circular />
+        <Header.Content>
+          { this.state.user.username }
+        </Header.Content>
+        {
+          this.renderFollowButton()
+        }
+      </Header>
+    );
+  }
+
+  renderUserNotFound() {
+    return (
+      <Header as='h2' icon textAlign='center'>
+        <Header.Content>
+          <p>🤷</p>
+          {this.props.match.params.username} not found
+        </Header.Content>
+      </Header>
+    );
+  }
+
+  renderUserLoading() {
+    return (
+      <Dimmer active inverted>
+        <Loader inverted>Loading</Loader>
+      </Dimmer>
+    );
+  }
+
   render() {
     return (
       <div className="feed-main">
+        {
+          this.state.user ? this.renderUserBox() :
+          this.state.userNotFound ? this.renderUserNotFound() :
+          this.renderUserLoading()
+        }
         {
           this.isCurrentUser() && this.postNewTweetBox()
         }
