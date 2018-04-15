@@ -1,6 +1,7 @@
 package db
 
 import (
+	"fmt"
 	"net"
 	"net/rpc"
 
@@ -9,9 +10,10 @@ import (
 
 // Server serves a db store
 type Server struct {
-	store   *Store
-	inbound *net.TCPListener
-	port    string
+	store     *Store
+	inbound   *net.TCPListener
+	rpcServer *rpc.Server
+	port      string
 }
 
 // NewServer make a db hosting server
@@ -26,21 +28,27 @@ func NewServer(config config.Config) (*Server, error) {
 		return nil, err
 	}
 
+	// storage
 	store := NewStore()
-	if err := rpc.Register(store); err != nil {
+
+	// rcp server
+	rpcServer := rpc.NewServer()
+	if err := rpcServer.Register(store); err != nil {
 		return nil, err
 	}
 
 	return &Server{
-		store:   store,
-		inbound: inbound,
-		port:    config.DBPort,
+		store:     store,
+		inbound:   inbound,
+		rpcServer: rpcServer,
+		port:      config.DBPort,
 	}, nil
 }
 
 // Start start hosting db
 func (server *Server) Start() error {
-	go rpc.Accept(server.inbound)
+	fmt.Println("db rpc server hosting on", server.Port())
+	go server.rpcServer.Accept(server.inbound)
 	return nil
 }
 

@@ -213,6 +213,7 @@ func (s *Server) deleteTweet(c *gin.Context) {
 	}
 	if tweet == nil {
 		sendErr(c, http.StatusNotFound, "tweet not exist "+tid)
+		return
 	}
 
 	if tweet.Uname != user.Uname {

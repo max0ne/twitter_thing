@@ -33,13 +33,26 @@ func TestSetGet(t *testing.T) {
 func (suite *TestSetGetSuite) SetupTest() {
 	dbServer, err := newDB()
 	suite.Require().NoError(err)
+	suite.Require().NoError(dbServer.Start())
 	suite.dbServer = dbServer
+}
+
+func (suite *TestSetGetSuite) TearDownTest() {
+	fmt.Println("teardown")
+}
+
+func (suite *TestSetGetSuite) BeforeTest(suiteName, testName string) {
+	fmt.Println(suiteName, testName, "start")
+}
+
+func (suite *TestSetGetSuite) AfterTest(suiteName, testName string) {
+	fmt.Println(suiteName, testName, "done")
 }
 
 func (suite *TestSetGetSuite) TestGetSetSerial() {
 	client, err := db.NewClient(config.Config{
 		DBAddr: "localhost",
-		DBPort: "4000",
+		DBPort: suite.dbServer.Port(),
 	})
 	suite.Require().NoError(err)
 	t1 := client.NewTable("t1")
@@ -56,7 +69,7 @@ func (suite *TestSetGetSuite) TestGetSetSerial() {
 func (suite *TestSetGetSuite) TestGetParallel() {
 	client, err := db.NewClient(config.Config{
 		DBAddr: "localhost",
-		DBPort: "4000",
+		DBPort: suite.dbServer.Port(),
 	})
 	suite.Require().NoError(err)
 	t1 := client.NewTable("t1")
@@ -94,7 +107,7 @@ func (suite *TestSetGetSuite) TestGetParallel() {
 func (suite *TestSetGetSuite) TestSetDelParallel() {
 	client, err := db.NewClient(config.Config{
 		DBAddr: "localhost",
-		DBPort: "4000",
+		DBPort: suite.dbServer.Port(),
 	})
 	suite.Require().NoError(err)
 	t1 := client.NewTable("t1")

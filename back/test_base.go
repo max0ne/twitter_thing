@@ -52,6 +52,7 @@ func (suite *RouteTestSuite) SetupTest() {
 	dbServer, err := newDB()
 	suite.Require().NoError(err)
 	suite.dbServer = dbServer
+	suite.Require().NoError(dbServer.Start())
 
 	suite.ts = httptest.NewServer(NewServer(config.Config{
 		Role:   "api",
@@ -65,6 +66,7 @@ func (suite *RouteTestSuite) runTestCase(tc TestCase) {
 		fmt.Println("")
 		fmt.Println(">-", tc.desc)
 	}
+	suite.Require().NotNil(suite.ts)
 	if tc.method == "GET" {
 		suite.testGET(tc)
 	} else if tc.method == "POST" {
