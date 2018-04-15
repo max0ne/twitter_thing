@@ -5,7 +5,7 @@ import App from './component/App';
 import { Provider } from 'react-redux';
 import { createStore, applyMiddleware } from 'redux';
 import rootReducer from './redux/reducer';
-import * as setTokenMiddleware from './redux/setTokenMiddleware';
+import * as middleware from './redux/middleware';
 import registerServiceWorker from './registerServiceWorker';
 
 import 'semantic-ui-css/semantic.min.css';
@@ -13,7 +13,7 @@ import 'semantic-ui-css/semantic.min.css';
 /* eslint-disable no-underscore-dangle */
 const store = createStore(rootReducer,
   window.__REDUX_DEVTOOLS_EXTENSION__ && window.__REDUX_DEVTOOLS_EXTENSION__(),
-  applyMiddleware(setTokenMiddleware.middleware),
+  applyMiddleware(middleware.setAPIToken, middleware.setBaseURL),
 );
 /* eslint-enable */
 

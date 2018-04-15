@@ -13,14 +13,26 @@ import Navbar from './Navbar';
 import Feed from './Feed';
 import Login from './Login';
 
-import * as setTokenMiddleware from '../redux/setTokenMiddleware';
+import * as middleware from '../redux/middleware';
+import config from '../config';
 
 class Main extends Component {
   
   async componentWillMount() {
+    this.loadBaseURL();
+    this.refreshCurrentUser();
+  }
 
+  loadBaseURL() {
+    this.props.dispatch({
+      type: 'SET_BASE_URL',
+      baseURL: middleware.loadBaseURLFromLocalStorage() || config.defaultApiBaseURL,
+    });
+  }
+
+  async refreshCurrentUser() {
     try {
-      setTokenMiddleware.loadTokenFromLocalStorage();
+      middleware.loadTokenFromLocalStorage();
       const user = (await api.getCurrentUser()).data;
       if (user) {
         this.props.dispatch(action.setCurrentUser(user));

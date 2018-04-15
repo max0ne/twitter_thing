@@ -2,7 +2,6 @@ import axios from 'axios';
 import config from '../config';
 
 export const client = axios.create({
-  baseURL: config.apiBaseURL,
 });
 
 const TokenHeader = "Authorization";
@@ -10,6 +9,11 @@ const TokenHeader = "Authorization";
 export const setToken = (token) => {
   client.defaults.headers[TokenHeader] = token;
 }
+
+export const setBaseURL = (baseURL) => {
+  console.log('baseurl', baseURL);
+  client.defaults.baseURL = baseURL;
+};
 
 export async function signup(uname, password) {
   const resp = await client.post('/user/signup', {

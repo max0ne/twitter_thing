@@ -7,11 +7,14 @@ export const loadTokenFromLocalStorage = () => {
   api.setToken(window.localStorage.getItem(TokenLocalstorageKey));
 }
 
-export const middleware = store => next => action => {
-  const result = next(action)
+export const loadBaseURLFromLocalStorage = () => {
+  return window.localStorage.getItem('BaseURL');
+};
+
+export const setAPIToken = store => next => action => {
+  const result = next(action);
   
   if (action.type === 'SET_CURRENT_USER') {
-    console.log('action', JSON.stringify(action, undefined, 2));
     const token = store.getState().token;
     if (!token || token === undefined || token === 'undefined') {
       debugger;
@@ -20,7 +23,19 @@ export const middleware = store => next => action => {
     window.localStorage.setItem(TokenLocalstorageKey, token);
   }
 
-  console.log('midle', JSON.stringify(store.getState(), undefined, 2));
+  return result;
+}
+
+export const setBaseURL = store => next => action => {
+  const result = next(action);
+
+  if (action.type !== 'SET_BASE_URL') {
+    return result;
+  }
+  
+  const { baseURL } = store.getState();
+  api.setBaseURL(baseURL);
+  window.localStorage.setItem('BaseURL', baseURL);
 
   return result;
 }
