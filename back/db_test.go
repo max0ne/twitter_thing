@@ -115,34 +115,40 @@ func (suite *TestSetGetSuite) TestSetDelParallel() {
 	putTableChan := make(chan string)
 	delTableChan := make(chan bool)
 	for ii := 0; ii < 100; ii++ {
-		go func(ii int) {
+		go func() {
 			for ii := 0; ii < 10; ii++ {
 				tc := <-putTestCaseChan
 				suite.Require().NoError(t1.Put(tc, fmt.Sprintf("%s_val", tc)))
 				putTableChan <- tc
 			}
-		}(ii)
+		}()
 	}
 	for ii := 0; ii < 100; ii++ {
-		go func(ii int) {
+		go func() {
 			for ii := 0; ii < 10; ii++ {
 				tc := <-putTableChan
 				suite.Require().NoError(t1.Del(tc))
+				delTableChan <- true
 			}
-			delTableChan <- true
-		}(ii)
+		}()
 	}
+
+	for ii := 0; ii < 1000; ii++ {
+		<-delTableChan
+	}
+
+	fmt.Println("ha")
 
 	getTestCaseChan := getTestCases(1000)
 	getTableChan := make(chan bool)
 	for ii := 0; ii < 1000; ii++ {
-		go func(ii int) {
+		go func() {
 			tc := <-getTestCaseChan
 			got, err := t1.Get(tc)
 			suite.Require().NoError(err)
-			suite.Require().Equal(fmt.Sprintf("%s_val", tc), got)
+			suite.Require().Equal("", got)
 			getTableChan <- true
-		}(ii)
+		}()
 	}
 	for idx := 0; idx < 1000; idx++ {
 		<-getTableChan
