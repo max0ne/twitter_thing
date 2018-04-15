@@ -1,7 +1,7 @@
 import React, { Component } from 'react';
 import { connect } from 'react-redux';
 
-import { Menu, Popup } from 'semantic-ui-react';
+import { Menu, Popup, Form } from 'semantic-ui-react';
 import { Link } from 'react-router-dom';
 
 import _ from 'lodash';
@@ -15,8 +15,13 @@ class Navbar extends Component {
   constructor() {
     super();
 
+    this.state = {
+      baseURLInput: '',
+    };
+
     this.handleLogout = this.handleLogout.bind(this);
     this.handleUnregister = this.handleUnregister.bind(this);
+    this.handleChangeBaseURL = this.handleChangeBaseURL.bind(this);
   }
 
   async handleUnregister() {
@@ -35,14 +40,41 @@ class Navbar extends Component {
     this.props.dispatch(action.setCurrentUser(undefined));
   }
 
+  handleChangeBaseURL(e) {
+    e.preventDefault();
+    this.props.dispatch({
+      type: 'SET_BASE_URL',
+      baseURL: this.state.baseURLInput,
+    });
+    this.setState({
+      baseURLInput: '',
+    });
+  }
+
   renderUserNameDropdown(renderContent) {
     return (
       <Popup wide trigger={renderContent} on='click'>
-        <Menu pointing vertical>
+        <Menu vertical>
+          <Menu.Item name='me' as={Link} to={`/feed/${this.props.currentUser.uname}`} />
           <Menu.Item name='Logout' onClick={this.handleLogout} />
           <Menu.Item name='Unregister' onClick={this.handleUnregister} />
+          <Menu.Item>
+            { this.renderChangeBaseURLBox() }
+          </Menu.Item>
         </Menu>
       </Popup>
+    );
+  }
+
+  renderChangeBaseURLBox() {
+    return (
+      <Form>
+        <Form.Group widths='equal'>
+          <Form.Input fluid label='Base URL' value={this.state.baseURLInput} placeholder={this.props.baseURL}
+            onChange={(e) => this.setState({baseURLInput: e.target.value})}/>
+        </Form.Group>
+        <Form.Button onClick={this.handleChangeBaseURL}>Change</Form.Button>
+      </Form>
     );
   }
 
@@ -59,7 +91,7 @@ class Navbar extends Component {
               <Menu.Item name='signup' as={Link} to={`/login`}>Login</Menu.Item>
             ) : 
               this.renderUserNameDropdown(
-                <Menu.Item name='me' as={Link} to={`/feed/${this.props.currentUser.uname}`}>{this.props.currentUser.uname}</Menu.Item>
+                <Menu.Item name='me'>{this.props.currentUser.uname}</Menu.Item>
               )
         }
         </Menu.Menu>
@@ -70,6 +102,7 @@ class Navbar extends Component {
 
 const mapStateToProps = (state) => ({
   currentUser: state.currentUser,
+  baseURL: state.baseURL,
 });
 
 export default connect(mapStateToProps)(Navbar);
