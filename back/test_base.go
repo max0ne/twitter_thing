@@ -52,7 +52,9 @@ func (suite *RouteTestSuite) SetupTest() {
 	dbServer, err := newDB()
 	suite.Require().NoError(err)
 	suite.dbServer = dbServer
-	suite.Require().NoError(dbServer.Start())
+	dbServer.StartAsync(func(err error) {
+		suite.Require().NoError(err)
+	})
 
 	suite.ts = httptest.NewServer(NewServer(config.Config{
 		Role:   "api",

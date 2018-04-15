@@ -33,7 +33,9 @@ func TestSetGet(t *testing.T) {
 func (suite *TestSetGetSuite) SetupTest() {
 	dbServer, err := newDB()
 	suite.Require().NoError(err)
-	suite.Require().NoError(dbServer.Start())
+	dbServer.StartAsync(func(err error) {
+		suite.Require().NoError(err)
+	})
 	suite.dbServer = dbServer
 }
 

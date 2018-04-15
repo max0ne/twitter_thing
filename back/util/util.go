@@ -2,6 +2,8 @@ package util
 
 import (
 	"encoding/json"
+	"log"
+	"os"
 )
 
 // Contains - -
@@ -30,4 +32,13 @@ func Remove(vals []string, aVal string) []string {
 func JSONMarshel(val interface{}) string {
 	str, _ := json.Marshal(val)
 	return string(str)
+}
+
+// GetEnvMust get env, crashes if env key not set
+func GetEnvMust(key string) string {
+	val := os.Getenv(key)
+	if val == "" {
+		log.Fatal("env key ", key, " missing")
+	}
+	return val
 }

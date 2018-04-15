@@ -4,7 +4,6 @@ import (
 	"fmt"
 	"log"
 	"net/http"
-	"os"
 	"time"
 
 	"github.com/gin-contrib/cors"
@@ -12,6 +11,7 @@ import (
 	"github.com/max0ne/twitter_thing/back/db"
 	"github.com/max0ne/twitter_thing/back/middleware"
 	"github.com/max0ne/twitter_thing/back/model"
+	"github.com/max0ne/twitter_thing/back/util"
 
 	"github.com/gin-gonic/gin"
 )
@@ -357,18 +357,11 @@ func (s *Server) NewRouter() *gin.Engine {
 }
 
 func main() {
-	getEnvMust := func(key string) string {
-		val := os.Getenv(key)
-		if val == "" {
-			log.Fatal("env key", key, "missing")
-		}
-		return val
-	}
 
 	config := config.Config{
-		Role:   getEnvMust("Role"),
-		DBAddr: getEnvMust("DBAddr"),
-		DBPort: getEnvMust("DBPort"),
+		Role:   util.GetEnvMust("Role"),
+		DBAddr: util.GetEnvMust("DBAddr"),
+		DBPort: util.GetEnvMust("DBPort"),
 	}
 
 	switch config.Role {
@@ -380,7 +373,7 @@ func main() {
 		if err != nil {
 			log.Fatal(err)
 		}
-		if err = server.Start(); err != nil {
+		if err = server.StartSync(); err != nil {
 			log.Fatal(err)
 		}
 		break

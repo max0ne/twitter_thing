@@ -45,10 +45,17 @@ func NewServer(config config.Config) (*Server, error) {
 	}, nil
 }
 
-// Start start hosting db
-func (server *Server) Start() error {
+// StartAsync start hosting db asynchronously
+func (server *Server) StartAsync(cb func(err error)) {
+	go func() {
+		cb(server.StartSync())
+	}()
+}
+
+// StartSync start hosting db synchronously
+func (server *Server) StartSync() error {
 	fmt.Println("db rpc server hosting on", server.Port())
-	go server.rpcServer.Accept(server.inbound)
+	server.rpcServer.Accept(server.inbound)
 	return nil
 }
 
