@@ -2,10 +2,13 @@ package main
 
 import (
 	"fmt"
+	"log"
 	"net/http"
+	"os"
 	"time"
 
 	"github.com/gin-contrib/cors"
+	"github.com/max0ne/twitter_thing/back/config"
 	"github.com/max0ne/twitter_thing/back/db"
 	"github.com/max0ne/twitter_thing/back/middleware"
 	"github.com/max0ne/twitter_thing/back/model"
@@ -15,9 +18,9 @@ import (
 
 // Server - -
 type Server struct {
-	router *gin.Engine
-	store  *db.Store
-	tables globalTables
+	router   *gin.Engine
+	dbClient *db.Client
+	tables   globalTables
 }
 
 type globalTables struct {
@@ -64,6 +67,16 @@ func sendErr(c *gin.Context, code int, err string) {
 
 func sendObj(c *gin.Context, obj interface{}) {
 	c.JSON(200, obj)
+}
+
+func sendObjOrErr(c *gin.Context, code int) func(obj interface{}, err error) {
+	return func(obj interface{}, err error) {
+		if err != nil {
+			sendErr(c, code, err.Error())
+		} else {
+			sendObj(c, obj)
+		}
+	}
 }
 
 // RESTFul Apis
@@ -238,17 +251,26 @@ func (s *Server) unfollow(c *gin.Context) {
 
 // get users whom i am following
 func (s *Server) getFollowing(c *gin.Context) {
+	unames, err := model.GetFollowing(c.Param("uname"), s.tables.followingTable)
+	if cerr(c, err) {
+		return
+	}
+
 	sendObj(c,
 		model.GetUsers(
-			model.GetFollowing(c.Param("uname"), s.tables.followingTable), s.tables.userTable,
+			unames, s.tables.userTable,
 		))
 }
 
 // get users whom i
 func (s *Server) getFollower(c *gin.Context) {
+	unames, err := model.GetFollowers(c.Param("uname"), s.tables.followerTable)
+	if cerr(c, err) {
+		return
+	}
 	sendObj(c,
 		model.GetUsers(
-			model.GetFollowers(c.Param("uname"), s.tables.followerTable), s.tables.userTable,
+			unames, s.tables.userTable,
 		))
 }
 
@@ -259,7 +281,7 @@ func (s *Server) getUserTweets(c *gin.Context) {
 		return
 	}
 
-	sendObj(c, model.GetUserTweets(uname, s.tables.tweetTable, s.tables.postedByTable))
+	sendObjOrErr(c, http.StatusInternalServerError)(model.GetUserTweets(uname, s.tables.tweetTable, s.tables.postedByTable))
 }
 
 func (s *Server) getFeed(c *gin.Context) {
@@ -272,20 +294,23 @@ func (s *Server) getFeed(c *gin.Context) {
 }
 
 // NewServer - make a server
-func NewServer() Server {
-	store := db.NewStore()
+func NewServer(config config.Config) Server {
+	dbClient, err := db.NewClient(config)
+	if err != nil {
+		log.Fatal(err)
+	}
 	tables := globalTables{
-		userTable:      store.NewTable("userTable"),
-		tweetTable:     store.NewTable("tweetTable"),
-		bucketTable:    store.NewTable("bucketTable"),
-		postedByTable:  store.NewTable("postedByTable"),
-		followerTable:  store.NewTable("followerTable"),
-		followingTable: store.NewTable("followingTable"),
+		userTable:      dbClient.NewTable("userTable"),
+		tweetTable:     dbClient.NewTable("tweetTable"),
+		bucketTable:    dbClient.NewTable("bucketTable"),
+		postedByTable:  dbClient.NewTable("postedByTable"),
+		followerTable:  dbClient.NewTable("followerTable"),
+		followingTable: dbClient.NewTable("followingTable"),
 	}
 
 	s := Server{
-		store:  store,
-		tables: tables,
+		dbClient: dbClient,
+		tables:   tables,
 	}
 	s.router = s.NewRouter()
 	return s
@@ -324,12 +349,42 @@ func (s *Server) NewRouter() *gin.Engine {
 
 	if gin.IsDebugging() {
 		router.GET("/db", func(c *gin.Context) {
-			sendObj(c, s.store.GetM())
+			sendObjOrErr(c, 500)(s.dbClient.GetM())
 		})
 	}
 	return router
 }
 
 func main() {
-	NewServer().router.Run()
+	getEnvMust := func(key string) string {
+		val := os.Getenv(key)
+		if val == "" {
+			log.Fatal("env key", key, "missing")
+		}
+		return val
+	}
+
+	config := config.Config{
+		Role:   getEnvMust("Role"),
+		DBAddr: getEnvMust("DBAddr"),
+		DBPort: getEnvMust("DBPort"),
+	}
+
+	switch config.Role {
+	case "api":
+		NewServer(config).router.Run()
+		break
+	case "db":
+		server, err := db.NewServer(config)
+		if err != nil {
+			log.Fatal(err)
+		}
+		if err = server.Start(); err != nil {
+			log.Fatal(err)
+		}
+		break
+	default:
+		log.Fatal("illegal role", config.Role)
+		break
+	}
 }

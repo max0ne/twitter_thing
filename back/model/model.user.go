@@ -24,26 +24,26 @@ func NewUser(uname, password string) User {
 
 // GetUser - remove password field
 func GetUser(uname string, table *db.Table) (*User, error) {
-	if !table.Has(uname) {
-		return nil, nil
+	user, err := GetUserWithPassword(uname, table)
+	if user != nil {
+		user.Password = ""
 	}
-
-	var User User
-	if err := json.Unmarshal([]byte(table.Get(uname)), &User); err != nil {
-		return nil, err
-	}
-	User.Password = ""
-	return &User, nil
+	return user, err
 }
 
 // GetUserWithPassword - -
 func GetUserWithPassword(uname string, table *db.Table) (*User, error) {
-	if !table.Has(uname) {
+	hasUser, err := table.Has(uname)
+	if err != nil {
+		return nil, err
+	}
+	if !hasUser {
 		return nil, nil
 	}
 
 	var User User
-	if err := json.Unmarshal([]byte(table.Get(uname)), &User); err != nil {
+	err = table.GetObj(uname, &User)
+	if err != nil {
 		return nil, err
 	}
 	return &User, nil
@@ -80,35 +80,48 @@ func DeleteUser(user User, table *db.Table) error {
 // Follow - -
 func Follow(user User, vname string, followingTable, followerTable *db.Table) error {
 
-	insert := func(key, val string, table *db.Table) {
-		vstring := table.Get(key)
-		if util.Contains(strings.Split(vstring, ","), val) {
-			return
+	insert := func(key, val string, table *db.Table) error {
+		vstring, err := table.Get(key)
+		if err != nil {
+			return err
 		}
-		table.Put(key, vstring+","+val)
+		if util.Contains(strings.Split(vstring, ","), val) {
+			return nil
+		}
+		return table.Put(key, vstring+","+val)
 	}
 
-	insert(user.Uname, vname, followingTable)
-	insert(vname, user.Uname, followerTable)
-	return nil
+	if err := insert(user.Uname, vname, followingTable); err != nil {
+		return err
+	}
+	return insert(vname, user.Uname, followerTable)
 }
 
 // Unfollow - -
 func Unfollow(user User, vname string, followingTable, followerTable *db.Table) error {
-	remove := func(key, val string, table *db.Table) {
-		table.Put(key, strings.Join(util.Remove(strings.Split(table.Get(key), ","), val), ","))
+	remove := func(key, val string, table *db.Table) error {
+		ss, err := table.Get(key)
+		if err != nil {
+			return err
+		}
+		return table.Put(key, strings.Join(util.Remove(strings.Split(ss, ","), val), ","))
 	}
-	remove(user.Uname, vname, followingTable)
-	remove(vname, user.Uname, followerTable)
-	return nil
+	if err := remove(user.Uname, vname, followingTable); err != nil {
+		return err
+	}
+	return remove(vname, user.Uname, followerTable)
 }
 
 // GetFollowers - -
-func GetFollowers(vname string, followerTable *db.Table) []string {
-	return strings.Split(followerTable.Get(vname), ",")
+func GetFollowers(vname string, followerTable *db.Table) ([]string, error) {
+	ss, err := followerTable.Get(vname)
+	if err != nil {
+		return nil, err
+	}
+	return strings.Split(ss, ","), nil
 }
 
 // GetFollowing - -
-func GetFollowing(vname string, followerTable *db.Table) []string {
+func GetFollowing(vname string, followerTable *db.Table) ([]string, error) {
 	return GetFollowers(vname, followerTable)
 }

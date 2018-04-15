@@ -7,6 +7,10 @@ import (
 	"net/http"
 	"net/http/httptest"
 	"net/url"
+	"strconv"
+
+	"github.com/max0ne/twitter_thing/back/config"
+	"github.com/max0ne/twitter_thing/back/db"
 
 	"github.com/max0ne/twitter_thing/back/util"
 	"github.com/stretchr/testify/suite"
@@ -28,14 +32,32 @@ type TestCase struct {
 // RouteTestSuite test http route base suite
 type RouteTestSuite struct {
 	suite.Suite
-	ts *httptest.Server
+	ts       *httptest.Server
+	dbServer *db.Server
+}
+
+var incrementingDBPort = 4000
+
+func newDB() (*db.Server, error) {
+	incrementingDBPort++
+	return db.NewServer(config.Config{
+		Role:   "db",
+		DBAddr: "localhost",
+		DBPort: strconv.FormatInt(int64(incrementingDBPort), 10),
+	})
 }
 
 // SetupTest - -
 func (suite *RouteTestSuite) SetupTest() {
-	router := NewServer().router
-	ts := httptest.NewServer(router)
-	suite.ts = ts
+	dbServer, err := newDB()
+	suite.Require().NoError(err)
+	suite.dbServer = dbServer
+
+	suite.ts = httptest.NewServer(NewServer(config.Config{
+		Role:   "api",
+		DBAddr: "localhost",
+		DBPort: dbServer.Port(),
+	}).router)
 }
 
 func (suite *RouteTestSuite) runTestCase(tc TestCase) {
