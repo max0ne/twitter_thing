@@ -1,4 +1,4 @@
-twitter-thing back
+twitter-thing back - both DB and API service
 ---
 
 ## Setup
