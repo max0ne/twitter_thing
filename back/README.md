@@ -42,7 +42,7 @@ A sample run configuration:
 Role=db DBAddr=localhost DBPort=4000 go run main.go
 ```
 
-2. Run 2 api services
+2. Run however many number of api services you want each on a different port, i.e. *the frontend*, for example, 2
 ```
 # in a shell
 Role=api DBAddr=localhost DBPort=4000 PORT=8080 go run main.go
