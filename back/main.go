@@ -356,29 +356,23 @@ func (s *Server) NewRouter() *gin.Engine {
 	return router
 }
 
-func main() {
+func run(config config.Config) error {
+	switch config.Role {
+	case "api":
+		return NewServer(config).router.Run()
+	case "db":
+		_, err := db.RunServer(config)
+		return err
+	default:
+		return fmt.Errorf("illegal role " + config.Role)
+	}
+}
 
+func main() {
 	config := config.Config{
 		Role:   util.GetEnvMust("Role"),
 		DBAddr: util.GetEnvMust("DBAddr"),
 		DBPort: util.GetEnvMust("DBPort"),
 	}
-
-	switch config.Role {
-	case "api":
-		NewServer(config).router.Run()
-		break
-	case "db":
-		server, err := db.NewServer(config)
-		if err != nil {
-			log.Fatal(err)
-		}
-		if err = server.StartSync(); err != nil {
-			log.Fatal(err)
-		}
-		break
-	default:
-		log.Fatal("illegal role", config.Role)
-		break
-	}
+	run(config)
 }

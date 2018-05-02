@@ -2,14 +2,17 @@ package db
 
 import (
 	"fmt"
-	"strconv"
 	"sync"
 )
 
 // Store - -
 type Store struct {
-	m     map[string]string
-	mLock *sync.Mutex
+	m      map[string]string
+	incIDs map[string]int
+	mLock  *sync.Mutex
+
+	emitCommand func(cmd interface{})
+	isPrimary   bool
 }
 
 // GetArgs - -
@@ -54,10 +57,12 @@ type GetMReply struct {
 }
 
 // NewStore - -
-func NewStore() *Store {
+func NewStore(emitCommand func(cmd interface{}), isPrimary bool) *Store {
 	store := Store{
-		m:     map[string]string{},
-		mLock: &sync.Mutex{},
+		m:           map[string]string{},
+		mLock:       &sync.Mutex{},
+		emitCommand: emitCommand,
+		isPrimary:   isPrimary,
 	}
 	return &store
 }
@@ -82,24 +87,6 @@ func (s *Store) Get(args GetArgs, reply *GetReply) error {
 	return nil
 }
 
-// Put - -
-func (s *Store) Put(args PutArgs, ack *bool) error {
-	s.mLock.Lock()
-	defer s.mLock.Unlock()
-
-	s.m[args.Key] = args.Val
-	return nil
-}
-
-// Del - -
-func (s *Store) Del(args DelArgs, ack *bool) error {
-	s.mLock.Lock()
-	defer s.mLock.Unlock()
-
-	delete(s.m, args.Key)
-	return nil
-}
-
 // Has - -
 func (s *Store) Has(args GetArgs, reply *HasReply) error {
 	s.mLock.Lock()
@@ -110,21 +97,79 @@ func (s *Store) Has(args GetArgs, reply *HasReply) error {
 	return nil
 }
 
+// Put - -
+func (s *Store) Put(args PutArgs, ack *bool) error {
+	s.mLock.Lock()
+	defer s.mLock.Unlock()
+
+	if s.isPrimary {
+		s.put(args)
+	} else {
+		s.emitCommand(args)
+	}
+
+	return nil
+}
+
+// Del - -
+func (s *Store) Del(args DelArgs, ack *bool) error {
+	s.mLock.Lock()
+	defer s.mLock.Unlock()
+	if s.isPrimary {
+		s.del(args)
+	} else {
+		s.emitCommand(args)
+	}
+	return nil
+}
+
 // IncID - -
 func (s *Store) IncID(args IncIDArgs, reply *IncIDReply) error {
 	s.mLock.Lock()
 	defer s.mLock.Unlock()
-
-	key := "$IncID_" + args.TableName
-	if s.m[key] == "" {
-		s.m[key] = "1"
+	if s.isPrimary {
+		*reply = s.incid(args)
 	} else {
-		id, err := strconv.ParseInt(s.m[key], 10, 64)
-		if err != nil {
-			return err
-		}
-		s.m[key] = fmt.Sprintf("%d", id+1)
+		s.emitCommand(args)
 	}
-	*reply = IncIDReply{ID: s.m[key]}
 	return nil
+}
+
+// ---
+// internal write methods
+// ---
+func (s *Store) put(args PutArgs) {
+	s.m[args.Key] = args.Val
+}
+func (s *Store) del(args DelArgs) {
+	delete(s.m, args.Key)
+}
+func (s *Store) incid(args IncIDArgs) IncIDReply {
+	s.incIDs[args.TableName]++
+	return IncIDReply{
+		ID: fmt.Sprintf("%d", s.incIDs[args.TableName]),
+	}
+}
+
+func (s *Store) processWriteCommand(cmd interface{}) {
+	s.mLock.Lock()
+	defer s.mLock.Unlock()
+
+	putArg, ok := cmd.(PutArgs)
+	if ok {
+		s.put(putArg)
+		return
+	}
+
+	delArg, ok := cmd.(DelArgs)
+	if ok {
+		s.del(delArg)
+		return
+	}
+
+	incIDArg, ok := cmd.(IncIDArgs)
+	if ok {
+		s.incid(incIDArg)
+		return
+	}
 }

@@ -7,7 +7,6 @@ import (
 	"net/http"
 	"net/http/httptest"
 	"net/url"
-	"strconv"
 
 	"github.com/max0ne/twitter_thing/back/config"
 	"github.com/max0ne/twitter_thing/back/db"
@@ -38,29 +37,83 @@ type RouteTestSuite struct {
 
 var incrementingDBPort = 4000
 
-func newDB() (*db.Server, error) {
+func incrementDBPort() int {
 	incrementingDBPort++
-	return db.NewServer(config.Config{
-		Role:   "db",
-		DBAddr: "localhost",
-		DBPort: strconv.FormatInt(int64(incrementingDBPort), 10),
-	})
+	return incrementingDBPort
+}
+
+func makeDBConfigs() []config.Config {
+	vrport1 := incrementDBPort()
+	vrport2 := incrementDBPort()
+	vrport3 := incrementDBPort()
+	vrpeerURLs := []string{
+		fmt.Sprintf("localhost:%d", vrport1),
+		fmt.Sprintf("localhost:%d", vrport2),
+		fmt.Sprintf("localhost:%d", vrport3),
+	}
+
+	confs := []config.Config{
+		config.Config{
+			Role:       "db",
+			DBAddr:     "localhost",
+			DBPort:     fmt.Sprintf("%d", incrementDBPort()),
+			VRPort:     fmt.Sprintf("%d", vrport1),
+			VRPeerURLs: vrpeerURLs,
+			VRPrimary:  0,
+		},
+		config.Config{
+			Role:       "db",
+			DBAddr:     "localhost",
+			DBPort:     fmt.Sprintf("%d", incrementDBPort()),
+			VRPort:     fmt.Sprintf("%d", vrport1),
+			VRPeerURLs: vrpeerURLs,
+			VRPrimary:  0,
+		},
+		config.Config{
+			Role:       "db",
+			DBAddr:     "localhost",
+			DBPort:     fmt.Sprintf("%d", incrementDBPort()),
+			VRPort:     fmt.Sprintf("%d", vrport1),
+			VRPeerURLs: vrpeerURLs,
+			VRPrimary:  0,
+		},
+	}
+	return confs
+}
+
+// newDB run a db instance
+// primary - true to return primary instance of db, false to return replica instance of db
+func newDB(primary bool) (*db.Server, error) {
+	configs := makeDBConfigs()
+	var dbToReturn *db.Server
+	for _, config := range configs {
+		server, err := db.RunServer(config)
+		if err != nil {
+			return nil, err
+		}
+		if primary && config.VRMe() == config.VRPrimary {
+			dbToReturn = server
+		}
+		if !primary && config.VRMe() != config.VRPrimary {
+			dbToReturn = server
+		}
+	}
+	return dbToReturn, nil
 }
 
 // SetupTest - -
 func (suite *RouteTestSuite) SetupTest() {
-	dbServer, err := newDB()
-	suite.Require().NoError(err)
-	suite.dbServer = dbServer
-	dbServer.StartAsync(func(err error) {
-		suite.Require().NoError(err)
-	})
+	// TODO: rewrite this part based on VR
+	// dbServer, err := =()
+	// suite.Require().NoError(err)
+	// suite.dbServer = dbServer
+	// go db.Server.StartSync()
 
-	suite.ts = httptest.NewServer(NewServer(config.Config{
-		Role:   "api",
-		DBAddr: "localhost",
-		DBPort: dbServer.Port(),
-	}).router)
+	// suite.ts = httptest.NewServer(NewServer(config.Config{
+	// 	Role:   "api",
+	// 	DBAddr: "localhost",
+	// 	DBPort: dbServer.Port(),
+	// }).router)
 }
 
 func (suite *RouteTestSuite) runTestCase(tc TestCase) {

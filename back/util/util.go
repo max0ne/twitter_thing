@@ -3,6 +3,8 @@ package util
 import (
 	"encoding/json"
 	"log"
+	"net"
+	"net/rpc"
 	"os"
 )
 
@@ -41,4 +43,22 @@ func GetEnvMust(key string) string {
 		log.Fatal("env key ", key, " missing")
 	}
 	return val
+}
+
+// NewRPC make an rpc server
+func NewRPC(url string, rcvr interface{}) (*net.TCPListener, *rpc.Server, error) {
+	addy, err := net.ResolveTCPAddr("tcp", url)
+	if err != nil {
+		return nil, nil, err
+	}
+	inbound, err := net.ListenTCP("tcp", addy)
+	if err != nil {
+		return nil, nil, err
+	}
+	// rcp server
+	rpcServer := rpc.NewServer()
+	if err := rpcServer.Register(rcvr); err != nil {
+		return nil, nil, err
+	}
+	return inbound, rpcServer, nil
 }
