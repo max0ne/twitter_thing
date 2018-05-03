@@ -1,6 +1,7 @@
 package db
 
 import (
+	"fmt"
 	"net/rpc"
 	"time"
 
@@ -17,7 +18,7 @@ type Server struct {
 }
 
 func (server *Server) emitVRCommand(cmd interface{}) {
-	server.vrServer.PushCommand(cmd)
+	vr.PushCommand(server.vrServer, cmd)
 }
 
 // RunServer make a db hosting server
@@ -42,6 +43,7 @@ func RunServer(config config.Config) (*Server, error) {
 	}
 
 	// 4. start hosting rpc servers
+	fmt.Println("vr rpc server listening on", config.VRURL())
 	go vrRPCServer.Accept(vrConn)
 
 	// 5. sleep for a while to wait for all vr server to start listening
@@ -54,9 +56,10 @@ func RunServer(config config.Config) (*Server, error) {
 	}
 
 	// 7. start vr logic
-	vrServer.Start(rpcClients, config.VRMe())
+	vr.Start(vrServer, rpcClients, config.VRMe())
 
 	// 8. start hosting db server
+	fmt.Println("db rpc server listening on", config.DBURL())
 	go dbRPCServer.Accept(dbConn)
 
 	server.store = store

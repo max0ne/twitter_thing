@@ -65,7 +65,7 @@ func makeDBConfigs() []config.Config {
 			Role:       "db",
 			DBAddr:     "localhost",
 			DBPort:     fmt.Sprintf("%d", incrementDBPort()),
-			VRPort:     fmt.Sprintf("%d", vrport1),
+			VRPort:     fmt.Sprintf("%d", vrport2),
 			VRPeerURLs: vrpeerURLs,
 			VRPrimary:  0,
 		},
@@ -73,7 +73,7 @@ func makeDBConfigs() []config.Config {
 			Role:       "db",
 			DBAddr:     "localhost",
 			DBPort:     fmt.Sprintf("%d", incrementDBPort()),
-			VRPort:     fmt.Sprintf("%d", vrport1),
+			VRPort:     fmt.Sprintf("%d", vrport3),
 			VRPeerURLs: vrpeerURLs,
 			VRPrimary:  0,
 		},
@@ -86,19 +86,34 @@ func makeDBConfigs() []config.Config {
 func newDB(primary bool) (*db.Server, error) {
 	configs := makeDBConfigs()
 	var dbToReturn *db.Server
-	for _, config := range configs {
-		server, err := db.RunServer(config)
-		if err != nil {
-			return nil, err
-		}
-		if primary && config.VRMe() == config.VRPrimary {
-			dbToReturn = server
-		}
-		if !primary && config.VRMe() != config.VRPrimary {
-			dbToReturn = server
-		}
+	var errToReturn error
+
+	//
+	dbInitChan := make(chan bool, len(configs))
+
+	// program expecting multiple db replicas launching simultaniously (within 1 sec grace period)
+	// so have to use go routine to launch all db instances all together
+	for _, conf := range configs {
+		go func(config config.Config) {
+			server, err := db.RunServer(config)
+			if err != nil {
+				errToReturn = err
+			}
+			if primary && config.VRMe() == config.VRPrimary {
+				dbToReturn = server
+			}
+			if !primary && config.VRMe() != config.VRPrimary {
+				dbToReturn = server
+			}
+			dbInitChan <- true
+		}(conf)
 	}
-	return dbToReturn, nil
+
+	for idx := 0; idx < len(configs); idx++ {
+		<-dbInitChan
+	}
+
+	return dbToReturn, errToReturn
 }
 
 // SetupTest - -

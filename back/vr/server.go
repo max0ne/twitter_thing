@@ -201,7 +201,7 @@ func Make(processCommand ProcessCommand) *PBServer {
 
 // Start by assigning a list of connected peers
 // this should only be called once after `Make`
-func (srv *PBServer) Start(peers []*rpc.Client, me int) {
+func Start(srv *PBServer, peers []*rpc.Client, me int) {
 	srv.peers = peers
 	srv.me = me
 }
@@ -218,7 +218,7 @@ func (srv *PBServer) Start(peers []*rpc.Client, me int) {
 // *if it's eventually committed*. The second return value is the current
 // view. The third return value is true if this server believes it is
 // the primary.
-func (srv *PBServer) PushCommand(command interface{}) (int, int, bool) {
+func PushCommand(srv *PBServer, command interface{}) (int, int, bool) {
 	srv.mu.Lock()
 	defer srv.mu.Unlock()
 
