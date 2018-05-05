@@ -8,56 +8,43 @@ package vr
 
 import (
 	"fmt"
-	"log"
 	"net/rpc"
 	"sync"
-	"time"
-
-	"github.com/fatih/color"
+	//"fmt"
 )
-
-// ProcessCommand process command function
-type ProcessCommand func(cmd interface{})
 
 // the 3 possible server status
 const (
 	NORMAL = iota
 	VIEWCHANGE
 	RECOVERING
-	STATETRANSFER
 )
-
-const debugging = true
 
 // PBServer defines the state of a replica server (either primary or backup)
 type PBServer struct {
-	mu             sync.Mutex    // Lock to protect shared access to this peer's state
-	peers          []*rpc.Client // RPC end points of all peers
-	me             int           // this peer's index into peers[]
-	currentView    int           // what this peer believes to be the current active view
-	status         int           // the server's current status (NORMAL, VIEWCHANGE or RECOVERING)
-	lastNormalView int           // the latest view which had a NORMAL status
+	mu             sync.Mutex // Lock to protect shared access to this peer's state
+	peers          []*peer    // RPC end points of all peers
+	me             int        // this peer's index into peers[]
+	currentView    int        // what this peer believes to be the current active view
+	status         int        // the server's current status (NORMAL, VIEWCHANGE or RECOVERING)
+	lastNormalView int        // the latest view which had a NORMAL status
 
-	log []interface{} // the log of "commands"
+	log         []interface{} // the log of "commands"
+	commitIndex int           // all log entries <= commitIndex are considered to have been committed.
 
-	// `commit-number`
-	commitIndex int // all log entries <= commitIndex are considered to have been committed.
-
-	// key being request index
-	// value being list of peer ids
-	prepareOKTable map[int][]int
-
-	processCommand ProcessCommand
+	// process 1 command
+	processCommand func(cmd interface{})
+	// replace entire log
+	replaceCommands func(cmds []interface{})
 }
 
-// PrepareArgs Prepare defines the arguments for the Prepare RPC
+// Prepare defines the arguments for the Prepare RPC
 // Note that all field names must start with a capital letter for an RPC args struct
 type PrepareArgs struct {
 	View          int         // the primary's current view
 	PrimaryCommit int         // the primary's commitIndex
 	Index         int         // the index position at which the log entry is to be replicated on backups
 	Entry         interface{} // the log entry to be replicated
-	From          int         // primary machine index
 }
 
 // PrepareReply defines the reply for the Prepare RPC
@@ -67,70 +54,42 @@ type PrepareReply struct {
 	Success bool // whether the Prepare request has been accepted or rejected
 }
 
-// CommitArgs Prepare defines the arguments for the Prepare RPC
-// Note that all field names must start with a capital letter for an RPC args struct
-type CommitArgs struct {
-	View          int // the primary's current view
-	PrimaryCommit int // the primary's commitIndex
-}
-
-// CommitReply defines the reply for the Prepare RPC
-// Note that all field names must start with a capital letter for an RPC reply struct
-type CommitReply struct {
-	View    int  // the backup's current view
-	Success bool // whether the Prepare request has been accepted or rejected
-}
-
-// RecoveryArgs defined the arguments for the Recovery RPC
+// RecoverArgs defined the arguments for the Recovery RPC
 type RecoveryArgs struct {
 	View   int // the view that the backup would like to synchronize with
 	Server int // the server sending the Recovery RPC (for debugging)
 }
 
-// RecoveryReply - -
 type RecoveryReply struct {
 	View          int           // the view of the primary
 	Entries       []interface{} // the primary's log including entries replicated up to and including the view.
 	PrimaryCommit int           // the primary's commitIndex
 	Success       bool          // whether the Recovery request has been accepted or rejected
-	From          int
 }
 
-// ViewChangeArgs - -
 type ViewChangeArgs struct {
 	View int // the new view to be changed into
 }
 
-// ViewChangeReply - -
 type ViewChangeReply struct {
 	LastNormalView int           // the latest view which had a NORMAL status at the server
 	Log            []interface{} // the log at the server
 	Success        bool          // whether the ViewChange request has been accepted/rejected
-	From           int
 }
 
-// StartViewArgs - -
 type StartViewArgs struct {
 	View int           // the new view which has completed view-change
 	Log  []interface{} // the log associated with the new new
 }
 
-// StartViewReply - -
 type StartViewReply struct {
 }
 
-// StateTransArgs state transfer arguments
-type StateTransArgs struct {
-	View  int
-	Index int
+type CommitArg struct {
+	PrimaryCommit int
 }
 
-// StateTransReply state transfer reply
-type StateTransReply struct {
-	View         int
-	Logs         []interface{}
-	CommitNumber int
-	Success      bool
+type CommitReply struct {
 }
 
 // GetPrimary is an auxilary function that returns the server index of the
@@ -139,16 +98,11 @@ func GetPrimary(view int, nservers int) int {
 	return view % nservers
 }
 
-func (srv *PBServer) nF() int {
-	return len(srv.peers)/2 + 1
-}
-
 // isCommitted is called by tester to check whether an index position
 // has been considered committed by this server
 func (srv *PBServer) isCommitted(index int) (committed bool) {
 	srv.mu.Lock()
 	defer srv.mu.Unlock()
-	srv.debug("isCommitted", srv.commitIndex, index)
 	if srv.commitIndex >= index {
 		return true
 	}
@@ -184,31 +138,27 @@ func (srv *PBServer) kill() {
 // Make is called by tester to create and initalize a PBServer
 // peers is the list of RPC endpoints to every server (including self)
 // me is this server's index into peers.
-func Make(processCommand ProcessCommand) *PBServer {
+// startingView is the initial view (set to be zero) that all servers start in
+func Make(me int,
+	processCommand func(cmd interface{}),
+	replaceCommands func(cmds []interface{})) *PBServer {
 	srv := &PBServer{
-		currentView:    0,
-		lastNormalView: 0,
-		status:         NORMAL,
+		me:              me,
+		processCommand:  processCommand,
+		replaceCommands: replaceCommands,
+		status:          NORMAL,
 	}
 	// all servers' log are initialized with a dummy command at index 0
 	var v interface{}
 	srv.log = append(srv.log, v)
-
-	srv.prepareOKTable = map[int][]int{}
-	srv.processCommand = processCommand
-
-	// Your other initialization code here, if there's any
 	return srv
 }
 
-// Start by assigning a list of connected peers
-// this should only be called once after `Make`
-func Start(srv *PBServer, peers []*rpc.Client, me int) {
-	srv.peers = peers
-	srv.me = me
+func Start(srv *PBServer, peers []*rpc.Client) {
+	srv.peers = makePeers(peers)
 }
 
-// PushCommand is invoked by tester on some replica server to replicate a
+// PushCommand() is invoked by tester on some replica server to replicate a
 // command.  Only the primary should process this request by appending
 // the command to its log and then return *immediately* (while the log is being replicated to backup servers).
 // if this server isn't the primary, returns false.
@@ -223,80 +173,43 @@ func Start(srv *PBServer, peers []*rpc.Client, me int) {
 func (srv *PBServer) PushCommand(command interface{}, reply *bool) error {
 	srv.mu.Lock()
 	defer srv.mu.Unlock()
-
-	// do not process command if status is not NORMAL
-	if srv.status != NORMAL {
-		return fmt.Errorf("db status %d not NORMAL, put failed", srv.status)
-	}
-	// if i am not the primary in the current view, forward the command to primary
+	// if i am not the primary, forward message to primary
 	if GetPrimary(srv.currentView, len(srv.peers)) != srv.me {
-		srv.callPeer(GetPrimary(srv.currentView, len(srv.peers)), "PBServer.PushCommand", &command, nil)
+		srv.peers[GetPrimary(srv.currentView, len(srv.peers))].Call("PBServer.PushCommand", &command, nil)
 		return nil
 	}
-
-	// adds the request to the end of the log
-	srv.debug("appending command log", command, srv.log, len(srv.log))
-	commandInsertIndex := len(srv.log)
-
-	srv.appendLogEntry(command)
-
-	// Then it sends a ⟨PREPARE v, m, n, k⟩ message to the other replicas
-	// where v is the current view-number
-	// m is the message it received from the client
-	// n is the op-number it assigned to the request
-	// and k is the commit-number
-	srv.primarySendPrepare(srv.currentView, command, srv.commitIndex, commandInsertIndex)
-
-	return nil
-}
-
-func (srv *PBServer) primarySendPrepare(
-	viewNumber int,
-	msg interface{},
-	commitNumber int,
-	commandInsertIndex int) {
-	prepareArg := &PrepareArgs{
-		View:          viewNumber,
-		PrimaryCommit: commitNumber,
-		Index:         commandInsertIndex,
-		Entry:         msg,
-		From:          srv.me,
+	// do not process command if status is not NORMAL
+	if srv.status != NORMAL {
+		return fmt.Errorf("vr server status not NORMAL, %d", srv.status)
 	}
-	for idx := range srv.peers {
-		go srv.sendPrepare(idx, prepareArg, &PrepareReply{})
-	}
-}
 
-// PrepareOKArgs = =
-type PrepareOKArgs struct {
-	View int
+	srv.doProcessCommand(command)
 
-	// commandInsertIndex
-	Index int
-
-	// machine index
-	From int
-}
-
-// PrepareOKReply = =
-type PrepareOKReply struct {
-	Success bool
-}
-
-func (srv *PBServer) shouldCommit(index int) bool {
-	return len(srv.prepareOKTable[index]) >= srv.nF()
-}
-
-func (srv *PBServer) sendCommits(index int) {
-	for idx := 0; idx <= index; idx++ {
-		for _, peerIdx := range srv.prepareOKTable[idx] {
-			commitArgs := CommitArgs{
-				View:          srv.currentView,
-				PrimaryCommit: idx,
+	go func(command interface{}, primaryServer *PBServer, log_length int) {
+		cnt := 0
+		for i := 0; i < len(primaryServer.peers); i++ {
+			var reply PrepareReply
+			args := PrepareArgs{
+				View:          primaryServer.currentView,
+				PrimaryCommit: primaryServer.commitIndex,
+				Index:         log_length - 1,
+				Entry:         command,
 			}
-			go srv.primarySendCommit(peerIdx, &commitArgs, &CommitReply{})
+
+			rpc_ok := primaryServer.sendPrepare(i, &args, &reply)
+			if rpc_ok && reply.Success {
+				cnt = cnt + 1
+				// If the primary has received Success=true responses from a majority of servers (including itself)
+				// it considers the corresponding log index as "committed".
+				if len(primaryServer.peers)/2+1 == cnt {
+					if primaryServer.commitIndex < log_length-1 {
+						primaryServer.commitIndex = log_length - 1
+					}
+				}
+			}
 		}
-	}
+	}(command, srv, len(srv.log))
+	return nil
 }
 
 // exmple code to send an AppendEntries RPC to a server.
@@ -315,143 +228,181 @@ func (srv *PBServer) sendCommits(index int) {
 // A false return can be caused by a dead server, a live server that
 // can't be reached, a lost request, or a lost reply.
 func (srv *PBServer) sendPrepare(server int, args *PrepareArgs, reply *PrepareReply) bool {
-	return srv.callPeer(server, "PBServer.Prepare", args, reply)
+	return srv.peers[server].Call("PBServer.Prepare", args, reply)
 }
 
-func (srv *PBServer) sendStateTransferRequest(server int, args *StateTransArgs, reply *StateTransReply) bool {
-	return srv.callPeer(server, "PBServer.StateTransfer", args, reply)
-}
-
-func (srv *PBServer) needStateTransfer(targetIndex int) bool {
-	return len(srv.log) < targetIndex
-}
-
-// doStateTransferIfNot do state transfer if it
-func (srv *PBServer) doStateTransferIfNot(targetIndex int, completion func(success bool)) {
+// Prepare is the RPC handler for the Prepare RPC
+func (srv *PBServer) Prepare(args *PrepareArgs, reply *PrepareReply) error {
+	// Your code here
 	srv.mu.Lock()
-	defer func() {
-		srv.status = NORMAL
-		srv.mu.Unlock()
-	}()
-
-	srv.debug("preparing state transfer, target=%d", targetIndex)
-
-	if !srv.needStateTransfer(targetIndex) {
-		srv.debug("state transfer skipped")
-		go completion(true)
+	defer srv.mu.Unlock()
+	if srv.status != NORMAL || srv.currentView > args.View {
+		reply.Success = false
+	} else if GetPrimary(args.View, len(srv.peers)) == srv.me {
+		reply.Success = true
+	} else if args.Index == len(srv.log) && args.View == srv.currentView {
+		srv.doProcessCommand(args.Entry)
+		srv.commitIndex = args.PrimaryCommit
+		reply.Success = true
+		// its view is smaller or its log is missing entries
+	} else if len(srv.log) < args.Index || srv.currentView < args.View {
+		primary_id := GetPrimary(args.View, len(srv.peers))
+		reply.Success = false
+		recover_arg := RecoveryArgs{
+			View:   args.View, // the view that the backup would like to synchronize with
+			Server: srv.me,    // the server sending the Recovery RPC (for debugging)
+		}
+		var recover_reply RecoveryReply
+		// rpc call to the primary server
+		ok := srv.peers[primary_id].Call("PBServer.Recovery", &recover_arg, &recover_reply)
+		if ok && recover_reply.Success {
+			srv.doReplaceCommands(recover_reply.Entries)
+			srv.currentView = recover_reply.View
+			srv.commitIndex = recover_reply.PrimaryCommit
+			reply.Success = true
+		}
+	} else if len(srv.log) >= args.Index {
+		reply.Success = true
 	}
+	return nil
+}
 
-	if srv.status != NORMAL {
-		srv.debug("not doing state transfer because status =", srv.status)
+// Recovery is the RPC handler for the Recovery RPC
+func (srv *PBServer) Recovery(args *RecoveryArgs, reply *RecoveryReply) error {
+	srv.mu.Lock()
+	defer srv.mu.Unlock()
+	reply.View = srv.currentView
+	reply.Entries = srv.log
+	reply.PrimaryCommit = srv.commitIndex
+	reply.Success = true
+	/*
+		View          int           // the view of the primary
+		Entries       []interface{} // the primary's log including entries replicated up to and including the view.
+		PrimaryCommit int           // the primary's commitIndex
+		Success       bool          // whether the Recovery request has been accepted or rejected
+	*/
+	return nil
+}
+
+// Some external oracle prompts the primary of the newView to
+// switch to the newView.
+// promptViewChange just kicks start the view change protocol to move to the newView
+// It does not block waiting for the view change process to complete.
+func (srv *PBServer) promptViewChange(newView int) {
+	srv.mu.Lock()
+	defer srv.mu.Unlock()
+	newPrimary := GetPrimary(newView, len(srv.peers))
+
+	if newPrimary != srv.me { //only primary of newView should do view change
+		return
+	} else if newView <= srv.currentView {
 		return
 	}
-	srv.status = STATETRANSFER
-	srv.debug("start state transferring")
-	for idx := range srv.peers {
-		var reply StateTransReply
-		successed := srv.sendStateTransferRequest(idx, &StateTransArgs{
-			View:  srv.currentView,
-			Index: len(srv.log),
-		}, &reply)
-		srv.debug("peer", idx, "responsed", successed && reply.Success, "to state transfer request")
-		if !successed || !reply.Success {
-			continue
-		}
-		if reply.View == srv.currentView {
-			srv.debug("appending logs", srv.log, "with", reply.Logs)
+	vcArgs := &ViewChangeArgs{
+		View: newView,
+	}
+	vcReplyChan := make(chan *ViewChangeReply, len(srv.peers))
+	// send ViewChange to all servers including myself
+	for i := 0; i < len(srv.peers); i++ {
+		go func(server int) {
+			var reply ViewChangeReply
+			ok := srv.peers[server].Call("PBServer.ViewChange", vcArgs, &reply)
+			// fmt.Printf("node-%d (nReplies %d) received reply ok=%v reply=%v\n", srv.me, nReplies, ok, r.reply)
+			if ok {
+				vcReplyChan <- &reply
+			} else {
+				vcReplyChan <- nil
+			}
+		}(i)
+	}
 
-			srv.appendLogEntry(reply.Logs...)
-			srv.commitIndex = reply.CommitNumber
-
-			if len(srv.log) >= targetIndex {
-				go completion(true)
-				return
+	// wait to receive ViewChange replies
+	// if view change succeeds, send StartView RPC
+	go func() {
+		var successfulReplies []*ViewChangeReply
+		var nReplies int
+		majority := len(srv.peers)/2 + 1
+		for r := range vcReplyChan {
+			nReplies++
+			if r != nil && r.Success {
+				successfulReplies = append(successfulReplies, r)
+			}
+			if nReplies == len(srv.peers) || len(successfulReplies) == majority {
+				break
 			}
 		}
-	}
-	srv.debug("failed to do state transfer from", len(srv.log), "to", targetIndex)
-	go completion(false)
+		ok, log := srv.determineNewViewLog(successfulReplies)
+		if !ok {
+			return
+		}
+		svArgs := &StartViewArgs{
+			View: vcArgs.View,
+			Log:  log,
+		}
+		// send StartView to all servers including myself
+		for i := 0; i < len(srv.peers); i++ {
+			var reply StartViewReply
+			go func(server int) {
+				// fmt.Printf("node-%d sending StartView v=%d to node-%d\n", srv.me, svArgs.View, server)
+				srv.peers[server].Call("PBServer.StartView", svArgs, &reply)
+			}(i)
+		}
+	}()
 }
 
-func (srv *PBServer) primarySendCommit(server int, args *CommitArgs, reply *CommitReply) bool {
-	return srv.callPeer(server, "PBServer.Commit", args, reply)
-}
-
-func (srv *PBServer) backupAppendPrepareCommand(args PrepareArgs) {
+// determineNewViewLog is invoked to determine the log for the newView based on
+// the collection of replies for successful ViewChange requests.
+// if a quorum of successful replies exist, then ok is set to true.
+// otherwise, ok = false.
+func (srv *PBServer) determineNewViewLog(successfulReplies []*ViewChangeReply) (
+	ok bool, newViewLog []interface{}) {
 	srv.mu.Lock()
 	defer srv.mu.Unlock()
 
-	if srv.currentView != args.View {
-		return
-	}
-
-	srv.debug("processed prepare request", args.Index)
-
-	if args.Index < len(srv.log) {
-		srv.debug("no need to append log item because already contained in log")
-	} else if args.Index == len(srv.log) {
-		srv.debug("appending log item", args.Entry)
-		srv.appendLogEntry(args.Entry)
+	currentView := 0
+	if len(successfulReplies) != 0 {
+		ok = true
 	} else {
-		log.Fatalln("unable to append entry - missing log item before", len(srv.log), args.Index)
+		ok = false
 	}
-
-	var okReply PrepareOKReply
-	go srv.callPeer(args.From, "PBServer.PrepareOK", &PrepareOKArgs{
-		View:  srv.currentView,
-		Index: args.Index,
-		From:  srv.me,
-	}, &okReply)
-}
-
-func (srv *PBServer) debugf(format string, params ...interface{}) {
-	srv.debug(fmt.Sprintf(format, params...))
-}
-
-func (srv *PBServer) debug(params ...interface{}) {
-	if !debugging {
-		return
-	}
-	printFunc := func(params ...interface{}) {
-		if debugging {
-			// fmt.Printf(format+"\n", params...)
-
-			color.New([]color.Attribute{
-				color.FgRed,
-				color.FgGreen,
-				color.FgBlue,
-				color.FgYellow,
-				color.FgMagenta,
-				color.FgCyan,
-			}[srv.me]).Print(params...)
+	for i := 0; i < len(successfulReplies); i++ {
+		if successfulReplies[i].LastNormalView > currentView {
+			currentView = successfulReplies[i].LastNormalView
+			newViewLog = successfulReplies[i].Log
+		} else if len(successfulReplies[i].Log) > len(newViewLog) &&
+			successfulReplies[i].LastNormalView == currentView {
+			newViewLog = successfulReplies[i].Log
 		}
 	}
-
-	prefix := fmt.Sprintf("%s: [%d@%d] %s log=%d cmt=%d ",
-		time.Now().Format("05.000"),
-		srv.me, srv.currentView,
-		[]string{
-			"NORMAL",
-			"VIEWCHANGE",
-			"RECOVERING",
-			"STATETRANSFER",
-		}[srv.status], len(srv.log), srv.commitIndex)
-
-	params = append([]interface{}{prefix}, params...)
-	params = append(params, "\n")
-	printFunc(params...)
+	return ok, newViewLog
 }
 
-func (srv *PBServer) appendLogEntry(cmds ...interface{}) {
-	for _, cmd := range cmds {
-		srv.processCommand(cmd)
-		srv.log = append(srv.log, cmd)
+// ViewChange is the RPC handler to process ViewChange RPC.
+func (srv *PBServer) ViewChange(args *ViewChangeArgs, reply *ViewChangeReply) error {
+	srv.mu.Lock()
+	defer srv.mu.Unlock()
+	if srv.currentView < args.View {
+		srv.status = VIEWCHANGE
+		reply.LastNormalView = srv.currentView
+		reply.Log = srv.log
+		reply.Success = true
+	} else {
+		reply.Success = false
 	}
+	return nil
 }
 
-func (srv *PBServer) callPeer(server int, command string, args interface{}, reply interface{}) bool {
-	srv.debugf("calling peer %d <%s> %s", server, command, args)
-	err := srv.peers[server].Call(command, args, reply)
-	srv.debugf("got reply from peer %d <%s> %s err=%s", server, command, args, reply, err)
-	return err == nil
+// StartView is the RPC handler to process StartView RPC.
+func (srv *PBServer) StartView(args *StartViewArgs, reply *StartViewReply) error {
+	srv.mu.Lock()
+	defer srv.mu.Unlock()
+	if args.View < srv.currentView {
+		return nil
+	} else if args.View == srv.currentView && len(args.Log) < len(srv.log) {
+		return nil
+	}
+	srv.doReplaceCommands(args.Log)
+	srv.currentView = args.View
+	srv.status = NORMAL
+	return nil
 }

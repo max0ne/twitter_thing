@@ -6,6 +6,8 @@ import (
 	"net"
 	"net/rpc"
 	"os"
+
+	"github.com/fatih/color"
 )
 
 // Contains - -
@@ -61,4 +63,16 @@ func NewRPC(url string, rcvr interface{}) (*net.TCPListener, *rpc.Server, error)
 		return nil, nil, err
 	}
 	return inbound, rpcServer, nil
+}
+
+// LogColor - -
+func LogColor(idx int) func(a ...interface{}) (n int, err error) {
+	return color.New([]color.Attribute{
+		color.FgRed,
+		color.FgGreen,
+		color.FgYellow,
+		color.FgBlue,
+		color.FgMagenta,
+		color.FgCyan,
+	}[idx]).Println
 }

@@ -62,11 +62,10 @@ func NewStore(emitCommand func(cmd interface{}) error) *Store {
 	gob.Register(DelArgs{})
 	gob.Register(IncIDArgs{})
 	store := Store{
-		m:           map[string]string{},
-		incIDs:      map[string]int{},
 		mLock:       &sync.Mutex{},
 		emitCommand: emitCommand,
 	}
+	store.reset()
 	return &store
 }
 
@@ -125,27 +124,18 @@ func (s *Store) IncID(args IncIDArgs, reply *IncIDReply) error {
 // internal write methods
 // ---
 func (s *Store) put(args PutArgs) {
-	fmt.Println("put", args, s.m, s.m == nil)
 	s.m[args.Key] = args.Val
 }
 func (s *Store) del(args DelArgs) {
-	fmt.Println("del", args)
 	delete(s.m, args.Key)
 }
 func (s *Store) incid(args IncIDArgs) IncIDReply {
-	fmt.Println("incid", args)
 	s.incIDs[args.TableName]++
 	return IncIDReply{
 		ID: fmt.Sprintf("%d", s.incIDs[args.TableName]),
 	}
 }
-
-func (s *Store) processWriteCommand(cmd interface{}) {
-	s.mLock.Lock()
-	defer s.mLock.Unlock()
-
-	fmt.Println("process cmd", cmd)
-
+func (s *Store) command(cmd interface{}) {
 	putArg, ok := cmd.(PutArgs)
 	if ok {
 		s.put(putArg)
@@ -162,5 +152,25 @@ func (s *Store) processWriteCommand(cmd interface{}) {
 	if ok {
 		s.incid(incIDArg)
 		return
+	}
+}
+func (s *Store) reset() {
+	s.m = map[string]string{}
+	s.incIDs = map[string]int{}
+}
+
+func (s *Store) processCommand(cmd interface{}) {
+	s.mLock.Lock()
+	defer s.mLock.Unlock()
+	s.command(cmd)
+}
+
+func (s *Store) replaceWithCommands(cmd []interface{}) {
+	s.mLock.Lock()
+	defer s.mLock.Unlock()
+
+	s.reset()
+	for _, cmd := range cmd {
+		s.command(cmd)
 	}
 }

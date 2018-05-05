@@ -26,7 +26,6 @@ func (server *Server) emitVRCommand(cmd interface{}) error {
 
 // RunServer make a db hosting server
 func RunServer(config config.Config) (*Server, error) {
-
 	server := Server{}
 
 	// 1. setup db
@@ -37,7 +36,13 @@ func RunServer(config config.Config) (*Server, error) {
 	}
 
 	// 2. setup vr model
-	vrServer := vr.Make(store.processWriteCommand)
+	vrServer := vr.Make(config.VRMe(), func(cmd interface{}) {
+		util.LogColor(config.VRMe())(config.VRMe(), "process command", cmd)
+		store.processCommand(cmd)
+	}, func(cmds []interface{}) {
+		util.LogColor(config.VRMe())(config.VRMe(), "replace commands")
+		store.replaceWithCommands(cmds)
+	})
 
 	// 3. setup vr rpc
 	vrConn, vrRPCServer, err := util.NewRPC(config.VRURL(), vrServer)
@@ -59,7 +64,7 @@ func RunServer(config config.Config) (*Server, error) {
 	}
 
 	// 7. start vr logic
-	vr.Start(vrServer, rpcClients, config.VRMe())
+	vr.Start(vrServer, rpcClients)
 
 	// 8. start hosting db server
 	fmt.Println("db rpc server listening on", config.DBURL())

@@ -84,12 +84,18 @@ func makeDBConfigs() []config.Config {
 // newDB run a db instance
 // primary - true to return primary instance of db, false to return replica instance of db
 func newDB(primary bool) (*db.Server, error) {
-	configs := makeDBConfigs()
-	var dbToReturn *db.Server
-	var errToReturn error
+	dbs, err := newDBCluster()
+	if err != nil {
+		return nil, err
+	}
+	return dbs[0], nil
+}
 
-	//
-	dbInitChan := make(chan bool, len(configs))
+func newDBCluster() ([]*db.Server, error) {
+	configs := makeDBConfigs()
+	dbs := []*db.Server{}
+	var errToReturn error
+	dbInitChan := make(chan *db.Server, len(configs))
 
 	// program expecting multiple db replicas launching simultaniously (within 1 sec grace period)
 	// so have to use go routine to launch all db instances all together
@@ -99,21 +105,15 @@ func newDB(primary bool) (*db.Server, error) {
 			if err != nil {
 				errToReturn = err
 			}
-			if primary && config.VRMe() == config.VRPrimary {
-				dbToReturn = server
-			}
-			if !primary && config.VRMe() != config.VRPrimary {
-				dbToReturn = server
-			}
-			dbInitChan <- true
+			dbInitChan <- server
 		}(conf)
 	}
 
-	for idx := 0; idx < len(configs); idx++ {
-		<-dbInitChan
+	for idx := 0; idx < len(configs)-1; idx++ {
+		dbs = append(dbs, <-dbInitChan)
 	}
 
-	return dbToReturn, errToReturn
+	return dbs, errToReturn
 }
 
 // SetupTest - -

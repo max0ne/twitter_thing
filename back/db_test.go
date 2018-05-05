@@ -24,7 +24,7 @@ func getTestCases(cnt int) chan string {
 
 type TestSetGetSuite struct {
 	suite.Suite
-	dbServer *db.Server
+	dbCluster []*db.Server
 }
 
 func TestSetGet(t *testing.T) {
@@ -32,9 +32,9 @@ func TestSetGet(t *testing.T) {
 }
 
 func (suite *TestSetGetSuite) SetupTest() {
-	dbServer, err := newDB(false)
+	dbCluster, err := newDBCluster()
 	suite.Require().NoError(err)
-	suite.dbServer = dbServer
+	suite.dbCluster = dbCluster
 }
 
 func (suite *TestSetGetSuite) TearDownTest() {
@@ -52,14 +52,14 @@ func (suite *TestSetGetSuite) AfterTest(suiteName, testName string) {
 func (suite *TestSetGetSuite) TestGetSetSerial() {
 	client, err := db.NewClient(config.Config{
 		DBAddr: "localhost",
-		DBPort: suite.dbServer.Port(),
+		DBPort: suite.dbCluster[1].Port(),
 	})
 	suite.Require().NoError(err)
 	t1 := client.NewTable("t1")
 	for cs := range getTestCases(1000) {
 		t1.Put(cs, fmt.Sprintf("%s_val", cs))
 	}
-	<-time.After(time.Second * 10)
+	<-time.After(time.Second * 1)
 	for cs := range getTestCases(1000) {
 		got, err := t1.Get(cs)
 		suite.Require().NoError(err)
@@ -67,10 +67,10 @@ func (suite *TestSetGetSuite) TestGetSetSerial() {
 	}
 }
 
-func (suite *TestSetGetSuite) testGetParallel() {
+func (suite *TestSetGetSuite) TestGetParallel() {
 	client, err := db.NewClient(config.Config{
 		DBAddr: "localhost",
-		DBPort: suite.dbServer.Port(),
+		DBPort: suite.dbCluster[1].Port(),
 	})
 	suite.Require().NoError(err)
 	t1 := client.NewTable("t1")
@@ -80,9 +80,7 @@ func (suite *TestSetGetSuite) testGetParallel() {
 		go func(ii int) {
 			for ii := 0; ii < 10; ii++ {
 				tc := <-putTestCaseChan
-				fmt.Println("put")
 				t1.Put(tc, fmt.Sprintf("%s_val", tc))
-				fmt.Println("put done")
 			}
 			putTableChan <- true
 		}(ii)
@@ -91,6 +89,7 @@ func (suite *TestSetGetSuite) testGetParallel() {
 		<-putTableChan
 	}
 
+	<-time.After(time.Second * 1)
 	getTestCaseChan := getTestCases(1000)
 	getTableChan := make(chan bool)
 	for ii := 0; ii < 1000; ii++ {
@@ -106,14 +105,12 @@ func (suite *TestSetGetSuite) testGetParallel() {
 	for idx := 0; idx < 1000; idx++ {
 		<-getTableChan
 	}
-	fmt.Println("ha")
-
 }
 
 func (suite *TestSetGetSuite) testSetDelParallel() {
 	client, err := db.NewClient(config.Config{
 		DBAddr: "localhost",
-		DBPort: suite.dbServer.Port(),
+		DBPort: suite.dbCluster[1].Port(),
 	})
 	suite.Require().NoError(err)
 	t1 := client.NewTable("t1")
@@ -143,7 +140,7 @@ func (suite *TestSetGetSuite) testSetDelParallel() {
 		<-delTableChan
 	}
 
-	fmt.Println("ha")
+	<-time.After(time.Second * 1)
 
 	getTestCaseChan := getTestCases(1000)
 	getTableChan := make(chan bool)
