@@ -17,8 +17,11 @@ type Server struct {
 	port     string
 }
 
-func (server *Server) emitVRCommand(cmd interface{}) {
-	vr.PushCommand(server.vrServer, cmd)
+func (server *Server) emitVRCommand(cmd interface{}) error {
+	var cc interface{}
+	cc = cmd
+	go server.vrServer.PushCommand(cc, nil)
+	return nil
 }
 
 // RunServer make a db hosting server
@@ -27,7 +30,7 @@ func RunServer(config config.Config) (*Server, error) {
 	server := Server{}
 
 	// 1. setup db
-	store := NewStore(server.emitVRCommand, config.VRPrimary == config.VRMe())
+	store := NewStore(server.emitVRCommand)
 	dbConn, dbRPCServer, err := util.NewRPC(config.DBURL(), store)
 	if err != nil {
 		return nil, err
@@ -72,10 +75,10 @@ func connectVRPeers(config config.Config) ([]*rpc.Client, error) {
 	clients := []*rpc.Client{}
 	for _, peerURL := range config.VRPeerURLs {
 		// don't connect me, add a dummy client just to align array indices
-		if peerURL == config.VRURL() {
-			clients = append(clients, &rpc.Client{})
-			continue
-		}
+		// if peerURL == config.VRURL() {
+		// 	clients = append(clients, &rpc.Client{})
+		// 	continue
+		// }
 		// connect peer
 		client, err := rpc.Dial("tcp", peerURL)
 		if err != nil {

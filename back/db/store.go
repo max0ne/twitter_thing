@@ -1,6 +1,7 @@
 package db
 
 import (
+	"encoding/gob"
 	"fmt"
 	"sync"
 )
@@ -11,8 +12,7 @@ type Store struct {
 	incIDs map[string]int
 	mLock  *sync.Mutex
 
-	emitCommand func(cmd interface{})
-	isPrimary   bool
+	emitCommand func(cmd interface{}) error
 }
 
 // GetArgs - -
@@ -57,12 +57,15 @@ type GetMReply struct {
 }
 
 // NewStore - -
-func NewStore(emitCommand func(cmd interface{}), isPrimary bool) *Store {
+func NewStore(emitCommand func(cmd interface{}) error) *Store {
+	gob.Register(PutArgs{})
+	gob.Register(DelArgs{})
+	gob.Register(IncIDArgs{})
 	store := Store{
 		m:           map[string]string{},
+		incIDs:      map[string]int{},
 		mLock:       &sync.Mutex{},
 		emitCommand: emitCommand,
-		isPrimary:   isPrimary,
 	}
 	return &store
 }
@@ -101,50 +104,36 @@ func (s *Store) Has(args GetArgs, reply *HasReply) error {
 func (s *Store) Put(args PutArgs, ack *bool) error {
 	s.mLock.Lock()
 	defer s.mLock.Unlock()
-
-	if s.isPrimary {
-		s.put(args)
-	} else {
-		s.emitCommand(args)
-	}
-
-	return nil
+	return s.emitCommand(args)
 }
 
 // Del - -
 func (s *Store) Del(args DelArgs, ack *bool) error {
 	s.mLock.Lock()
 	defer s.mLock.Unlock()
-	if s.isPrimary {
-		s.del(args)
-	} else {
-		s.emitCommand(args)
-	}
-	return nil
+	return s.emitCommand(args)
 }
 
 // IncID - -
 func (s *Store) IncID(args IncIDArgs, reply *IncIDReply) error {
 	s.mLock.Lock()
 	defer s.mLock.Unlock()
-	if s.isPrimary {
-		*reply = s.incid(args)
-	} else {
-		s.emitCommand(args)
-	}
-	return nil
+	return s.emitCommand(args)
 }
 
 // ---
 // internal write methods
 // ---
 func (s *Store) put(args PutArgs) {
+	fmt.Println("put", args, s.m, s.m == nil)
 	s.m[args.Key] = args.Val
 }
 func (s *Store) del(args DelArgs) {
+	fmt.Println("del", args)
 	delete(s.m, args.Key)
 }
 func (s *Store) incid(args IncIDArgs) IncIDReply {
+	fmt.Println("incid", args)
 	s.incIDs[args.TableName]++
 	return IncIDReply{
 		ID: fmt.Sprintf("%d", s.incIDs[args.TableName]),
@@ -154,6 +143,8 @@ func (s *Store) incid(args IncIDArgs) IncIDReply {
 func (s *Store) processWriteCommand(cmd interface{}) {
 	s.mLock.Lock()
 	defer s.mLock.Unlock()
+
+	fmt.Println("process cmd", cmd)
 
 	putArg, ok := cmd.(PutArgs)
 	if ok {

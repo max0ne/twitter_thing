@@ -3,6 +3,7 @@ package main
 import (
 	"fmt"
 	"testing"
+	"time"
 
 	"github.com/stretchr/testify/suite"
 
@@ -31,7 +32,7 @@ func TestSetGet(t *testing.T) {
 }
 
 func (suite *TestSetGetSuite) SetupTest() {
-	dbServer, err := newDB(true)
+	dbServer, err := newDB(false)
 	suite.Require().NoError(err)
 	suite.dbServer = dbServer
 }
@@ -58,6 +59,7 @@ func (suite *TestSetGetSuite) TestGetSetSerial() {
 	for cs := range getTestCases(1000) {
 		t1.Put(cs, fmt.Sprintf("%s_val", cs))
 	}
+	<-time.After(time.Second * 10)
 	for cs := range getTestCases(1000) {
 		got, err := t1.Get(cs)
 		suite.Require().NoError(err)
@@ -65,7 +67,7 @@ func (suite *TestSetGetSuite) TestGetSetSerial() {
 	}
 }
 
-func (suite *TestSetGetSuite) TestGetParallel() {
+func (suite *TestSetGetSuite) testGetParallel() {
 	client, err := db.NewClient(config.Config{
 		DBAddr: "localhost",
 		DBPort: suite.dbServer.Port(),
@@ -78,7 +80,9 @@ func (suite *TestSetGetSuite) TestGetParallel() {
 		go func(ii int) {
 			for ii := 0; ii < 10; ii++ {
 				tc := <-putTestCaseChan
+				fmt.Println("put")
 				t1.Put(tc, fmt.Sprintf("%s_val", tc))
+				fmt.Println("put done")
 			}
 			putTableChan <- true
 		}(ii)
@@ -98,12 +102,15 @@ func (suite *TestSetGetSuite) TestGetParallel() {
 			getTableChan <- true
 		}(ii)
 	}
+
 	for idx := 0; idx < 1000; idx++ {
 		<-getTableChan
 	}
+	fmt.Println("ha")
+
 }
 
-func (suite *TestSetGetSuite) TestSetDelParallel() {
+func (suite *TestSetGetSuite) testSetDelParallel() {
 	client, err := db.NewClient(config.Config{
 		DBAddr: "localhost",
 		DBPort: suite.dbServer.Port(),

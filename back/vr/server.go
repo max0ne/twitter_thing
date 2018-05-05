@@ -12,6 +12,8 @@ import (
 	"net/rpc"
 	"sync"
 	"time"
+
+	"github.com/fatih/color"
 )
 
 // ProcessCommand process command function
@@ -25,7 +27,7 @@ const (
 	STATETRANSFER
 )
 
-const debugging = false
+const debugging = true
 
 // PBServer defines the state of a replica server (either primary or backup)
 type PBServer struct {
@@ -218,16 +220,18 @@ func Start(srv *PBServer, peers []*rpc.Client, me int) {
 // *if it's eventually committed*. The second return value is the current
 // view. The third return value is true if this server believes it is
 // the primary.
-func PushCommand(srv *PBServer, command interface{}) (int, int, bool) {
+func (srv *PBServer) PushCommand(command interface{}, reply *bool) error {
 	srv.mu.Lock()
 	defer srv.mu.Unlock()
 
 	// do not process command if status is not NORMAL
-	// and if i am not the primary in the current view
 	if srv.status != NORMAL {
-		return -1, srv.currentView, false
-	} else if GetPrimary(srv.currentView, len(srv.peers)) != srv.me {
-		return -1, srv.currentView, false
+		return fmt.Errorf("db status %d not NORMAL, put failed", srv.status)
+	}
+	// if i am not the primary in the current view, forward the command to primary
+	if GetPrimary(srv.currentView, len(srv.peers)) != srv.me {
+		srv.callPeer(GetPrimary(srv.currentView, len(srv.peers)), "PBServer.PushCommand", &command, nil)
+		return nil
 	}
 
 	// adds the request to the end of the log
@@ -243,7 +247,7 @@ func PushCommand(srv *PBServer, command interface{}) (int, int, bool) {
 	// and k is the commit-number
 	srv.primarySendPrepare(srv.currentView, command, srv.commitIndex, commandInsertIndex)
 
-	return commandInsertIndex, srv.currentView, true
+	return nil
 }
 
 func (srv *PBServer) primarySendPrepare(
@@ -280,12 +284,7 @@ type PrepareOKReply struct {
 }
 
 func (srv *PBServer) shouldCommit(index int) bool {
-	for idx := 0; idx <= index; idx++ {
-		if len(srv.prepareOKTable[index]) < srv.nF() {
-			return false
-		}
-	}
-	return true
+	return len(srv.prepareOKTable[index]) >= srv.nF()
 }
 
 func (srv *PBServer) sendCommits(index int) {
@@ -413,19 +412,22 @@ func (srv *PBServer) debug(params ...interface{}) {
 	if !debugging {
 		return
 	}
-	print := func(format string, params ...interface{}) {
+	printFunc := func(params ...interface{}) {
 		if debugging {
-			fmt.Printf(format+"\n", params...)
+			// fmt.Printf(format+"\n", params...)
 
-			// []func(format string, a ...interface{}){
-			// 	color.Black,
-			// 	color.Red,
-			// 	color.Blue,
-			// }[srv.me](format, params...)
+			color.New([]color.Attribute{
+				color.FgRed,
+				color.FgGreen,
+				color.FgBlue,
+				color.FgYellow,
+				color.FgMagenta,
+				color.FgCyan,
+			}[srv.me]).Print(params...)
 		}
 	}
 
-	print("%s: [%d@%d] %s log=%d cmt=%d %s",
+	prefix := fmt.Sprintf("%s: [%d@%d] %s log=%d cmt=%d ",
 		time.Now().Format("05.000"),
 		srv.me, srv.currentView,
 		[]string{
@@ -433,7 +435,11 @@ func (srv *PBServer) debug(params ...interface{}) {
 			"VIEWCHANGE",
 			"RECOVERING",
 			"STATETRANSFER",
-		}[srv.status], len(srv.log), srv.commitIndex, fmt.Sprintf("%s", params))
+		}[srv.status], len(srv.log), srv.commitIndex)
+
+	params = append([]interface{}{prefix}, params...)
+	params = append(params, "\n")
+	printFunc(params...)
 }
 
 func (srv *PBServer) appendLogEntry(cmds ...interface{}) {
@@ -446,6 +452,6 @@ func (srv *PBServer) appendLogEntry(cmds ...interface{}) {
 func (srv *PBServer) callPeer(server int, command string, args interface{}, reply interface{}) bool {
 	srv.debugf("calling peer %d <%s> %s", server, command, args)
 	err := srv.peers[server].Call(command, args, reply)
-	srv.debugf("got reply from peer %d <%s> %s err=%s", server, command, args, reply, err.Error())
+	srv.debugf("got reply from peer %d <%s> %s err=%s", server, command, args, reply, err)
 	return err == nil
 }

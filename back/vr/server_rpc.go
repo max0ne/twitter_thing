@@ -55,6 +55,7 @@ func (srv *PBServer) StateTransfer(args StateTransArgs, reply *StateTransReply) 
 func (srv *PBServer) Commit(args CommitArgs, reply *CommitReply) error {
 	srv.mu.Lock()
 	defer srv.mu.Unlock()
+
 	if srv.currentView != args.View {
 		return nil
 	}
