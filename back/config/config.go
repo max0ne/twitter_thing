@@ -22,8 +22,8 @@ type Config struct {
 	// list of vr peer urls
 	VRPeerURLs []string
 
-	// index of primary in `VRPeerURLs` array
-	VRPrimary int
+	// list of peer urls of dbs
+	DBPeerURLs []string
 }
 
 // DBURL convenience getter

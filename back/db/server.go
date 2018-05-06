@@ -12,15 +12,14 @@ import (
 
 // Server serves a db store
 type Server struct {
-	store    *Store
-	vrServer *vr.PBServer
-	port     string
+	store         *Store
+	vrServer      *vr.PBServer
+	dbPeerClients []*Client
+	port          string
 }
 
-func (server *Server) emitVRCommand(cmd interface{}) error {
-	var cc interface{}
-	cc = cmd
-	go server.vrServer.PushCommand(cc, nil)
+func (server *Server) emitVRCommand(cmd vr.Command) error {
+	go server.vrServer.PushCommand(cmd, nil)
 	return nil
 }
 
@@ -29,17 +28,17 @@ func RunServer(config config.Config) (*Server, error) {
 	server := Server{}
 
 	// 1. setup db
-	store := NewStore(server.emitVRCommand)
+	store := NewStore(server.emitVRCommand, &server)
 	dbConn, dbRPCServer, err := util.NewRPC(config.DBURL(), store)
 	if err != nil {
 		return nil, err
 	}
 
 	// 2. setup vr model
-	vrServer := vr.Make(config.VRMe(), func(cmd interface{}) {
+	vrServer := vr.Make(config.VRMe(), func(cmd vr.Command) {
 		util.LogColor(config.VRMe())(config.VRMe(), "process command", cmd)
 		store.processCommand(cmd)
-	}, func(cmds []interface{}) {
+	}, func(cmds []vr.Command) {
 		util.LogColor(config.VRMe())(config.VRMe(), "replace commands")
 		store.replaceWithCommands(cmds)
 	})
@@ -63,6 +62,12 @@ func RunServer(config config.Config) (*Server, error) {
 		return nil, err
 	}
 
+	// 6.5. connect all db peers
+	dbPeerClients, err := connectDBPeers(config)
+	if err != nil {
+		return nil, err
+	}
+
 	// 7. start vr logic
 	vr.Start(vrServer, rpcClients)
 
@@ -73,19 +78,27 @@ func RunServer(config config.Config) (*Server, error) {
 	server.store = store
 	server.vrServer = vrServer
 	server.port = config.DBPort
+	server.dbPeerClients = dbPeerClients
 	return &server, nil
 }
 
 func connectVRPeers(config config.Config) ([]*rpc.Client, error) {
 	clients := []*rpc.Client{}
 	for _, peerURL := range config.VRPeerURLs {
-		// don't connect me, add a dummy client just to align array indices
-		// if peerURL == config.VRURL() {
-		// 	clients = append(clients, &rpc.Client{})
-		// 	continue
-		// }
 		// connect peer
 		client, err := rpc.Dial("tcp", peerURL)
+		if err != nil {
+			return nil, err
+		}
+		clients = append(clients, client)
+	}
+	return clients, nil
+}
+
+func connectDBPeers(config config.Config) ([]*Client, error) {
+	clients := []*Client{}
+	for _, peerURL := range config.DBPeerURLs {
+		client, err := NewClient(peerURL)
 		if err != nil {
 			return nil, err
 		}

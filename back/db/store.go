@@ -4,6 +4,8 @@ import (
 	"encoding/gob"
 	"fmt"
 	"sync"
+
+	"github.com/max0ne/twitter_thing/back/vr"
 )
 
 // Store - -
@@ -12,7 +14,12 @@ type Store struct {
 	incIDs map[string]int
 	mLock  *sync.Mutex
 
-	emitCommand func(cmd interface{}) error
+	emitCommand func(cmd vr.Command) error
+	server      *Server
+}
+
+type Args struct {
+	Kind string
 }
 
 // GetArgs - -
@@ -24,6 +31,11 @@ type GetArgs struct {
 type PutArgs struct {
 	Key string
 	Val string
+}
+
+// IncIDArgs - -
+type IncIDArgs struct {
+	TableName string
 }
 
 // DelArgs - -
@@ -41,11 +53,6 @@ type HasReply struct {
 	Has bool
 }
 
-// IncIDArgs - -
-type IncIDArgs struct {
-	TableName string
-}
-
 // IncIDReply - -
 type IncIDReply struct {
 	ID string
@@ -57,13 +64,14 @@ type GetMReply struct {
 }
 
 // NewStore - -
-func NewStore(emitCommand func(cmd interface{}) error) *Store {
+func NewStore(emitCommand func(cmd vr.Command) error, server *Server) *Store {
 	gob.Register(PutArgs{})
 	gob.Register(DelArgs{})
 	gob.Register(IncIDArgs{})
 	store := Store{
 		mLock:       &sync.Mutex{},
 		emitCommand: emitCommand,
+		server:      server,
 	}
 	store.reset()
 	return &store
@@ -71,6 +79,18 @@ func NewStore(emitCommand func(cmd interface{}) error) *Store {
 
 // GetM - for debug only
 func (s *Store) GetM(args interface{}, reply *GetMReply) error {
+	// get from primary if not me
+	if !vr.IsPrimary(s.server.vrServer) {
+		val, err := s.server.dbPeerClients[vr.Primary(s.server.vrServer)].GetM()
+		if err != nil {
+			return err
+		}
+		*reply = GetMReply{
+			M: val,
+		}
+		return nil
+	}
+
 	s.mLock.Lock()
 	defer s.mLock.Unlock()
 
@@ -82,6 +102,19 @@ func (s *Store) GetM(args interface{}, reply *GetMReply) error {
 
 // Get - -
 func (s *Store) Get(args GetArgs, reply *GetReply) error {
+	// get from primary if not me
+	if !vr.IsPrimary(s.server.vrServer) {
+		fmt.Println("getting from primary")
+		val, err := s.server.dbPeerClients[vr.Primary(s.server.vrServer)].Get(args.Key)
+		if err != nil {
+			return err
+		}
+		*reply = GetReply{
+			Val: val,
+		}
+		return nil
+	}
+
 	s.mLock.Lock()
 	defer s.mLock.Unlock()
 
@@ -91,6 +124,18 @@ func (s *Store) Get(args GetArgs, reply *GetReply) error {
 
 // Has - -
 func (s *Store) Has(args GetArgs, reply *HasReply) error {
+	// get from primary if not me
+	if !vr.IsPrimary(s.server.vrServer) {
+		val, err := s.server.dbPeerClients[vr.Primary(s.server.vrServer)].Has(args.Key)
+		if err != nil {
+			return err
+		}
+		*reply = HasReply{
+			Has: val,
+		}
+		return nil
+	}
+
 	s.mLock.Lock()
 	defer s.mLock.Unlock()
 
@@ -101,23 +146,63 @@ func (s *Store) Has(args GetArgs, reply *HasReply) error {
 
 // Put - -
 func (s *Store) Put(args PutArgs, ack *bool) error {
+	// get from primary if not me
+	if !vr.IsPrimary(s.server.vrServer) {
+		fmt.Println(s.server.dbPeerClients, vr.Primary(s.server.vrServer))
+		err := s.server.dbPeerClients[vr.Primary(s.server.vrServer)].Put(args.Key, args.Val)
+		if err != nil {
+			return err
+		}
+		return nil
+	}
+
 	s.mLock.Lock()
 	defer s.mLock.Unlock()
-	return s.emitCommand(args)
+	return s.emitCommand(vr.Command{
+		Kind:  "Put",
+		Value: args,
+	})
 }
 
 // Del - -
 func (s *Store) Del(args DelArgs, ack *bool) error {
+	// get from primary if not me
+	if !vr.IsPrimary(s.server.vrServer) {
+		err := s.server.dbPeerClients[vr.Primary(s.server.vrServer)].Del(args.Key)
+		if err != nil {
+			return err
+		}
+		return nil
+	}
+
 	s.mLock.Lock()
 	defer s.mLock.Unlock()
-	return s.emitCommand(args)
+	return s.emitCommand(vr.Command{
+		Kind:  "Del",
+		Value: args,
+	})
 }
 
 // IncID - -
 func (s *Store) IncID(args IncIDArgs, reply *IncIDReply) error {
+	// get from primary if not me
+	if !vr.IsPrimary(s.server.vrServer) {
+		val, err := s.server.dbPeerClients[vr.Primary(s.server.vrServer)].IncID(args.TableName)
+		if err != nil {
+			return err
+		}
+		*reply = IncIDReply{
+			ID: val,
+		}
+		return nil
+	}
+
 	s.mLock.Lock()
 	defer s.mLock.Unlock()
-	return s.emitCommand(args)
+	return s.emitCommand(vr.Command{
+		Kind:  "IncID",
+		Value: args,
+	})
 }
 
 // ---
@@ -135,23 +220,35 @@ func (s *Store) incid(args IncIDArgs) IncIDReply {
 		ID: fmt.Sprintf("%d", s.incIDs[args.TableName]),
 	}
 }
-func (s *Store) command(cmd interface{}) {
-	putArg, ok := cmd.(PutArgs)
-	if ok {
-		s.put(putArg)
-		return
-	}
-
-	delArg, ok := cmd.(DelArgs)
-	if ok {
-		s.del(delArg)
-		return
-	}
-
-	incIDArg, ok := cmd.(IncIDArgs)
-	if ok {
-		s.incid(incIDArg)
-		return
+func (s *Store) command(cmd vr.Command) {
+	switch cmd.Kind {
+	case "Put":
+		{
+			putArg, ok := cmd.Value.(PutArgs)
+			if ok {
+				s.put(putArg)
+				return
+			}
+			break
+		}
+	case "Del":
+		{
+			arg, ok := cmd.Value.(DelArgs)
+			if ok {
+				s.del(arg)
+				return
+			}
+			break
+		}
+	case "IncID":
+		{
+			arg, ok := cmd.Value.(IncIDArgs)
+			if ok {
+				s.incid(arg)
+				return
+			}
+			break
+		}
 	}
 }
 func (s *Store) reset() {
@@ -159,13 +256,13 @@ func (s *Store) reset() {
 	s.incIDs = map[string]int{}
 }
 
-func (s *Store) processCommand(cmd interface{}) {
+func (s *Store) processCommand(cmd vr.Command) {
 	s.mLock.Lock()
 	defer s.mLock.Unlock()
 	s.command(cmd)
 }
 
-func (s *Store) replaceWithCommands(cmd []interface{}) {
+func (s *Store) replaceWithCommands(cmd []vr.Command) {
 	s.mLock.Lock()
 	defer s.mLock.Unlock()
 

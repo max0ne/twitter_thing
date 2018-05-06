@@ -1,10 +1,11 @@
 package db
 
 import (
+	"encoding/base64"
 	"encoding/json"
 	"net/rpc"
 
-	"github.com/max0ne/twitter_thing/back/config"
+	"github.com/gorilla/securecookie"
 )
 
 // Client db client
@@ -19,8 +20,8 @@ type Table struct {
 }
 
 // NewClient build a db client
-func NewClient(config config.Config) (*Client, error) {
-	client, err := rpc.Dial("tcp", config.DBURL())
+func NewClient(dburl string) (*Client, error) {
+	client, err := rpc.Dial("tcp", dburl)
 	if err != nil {
 		return nil, err
 	}
@@ -134,5 +135,5 @@ func (t *Table) key(key string) string {
 
 // IncID get auto increment id
 func (t *Table) IncID() (string, error) {
-	return t.dbClient.IncID(t.Name)
+	return base64.RawURLEncoding.EncodeToString(securecookie.GenerateRandomKey(64)), nil
 }

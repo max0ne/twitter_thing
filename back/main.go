@@ -296,7 +296,7 @@ func (s *Server) getFeed(c *gin.Context) {
 
 // NewServer - make a server
 func NewServer(config config.Config) Server {
-	dbClient, err := db.NewClient(config)
+	dbClient, err := db.NewClient(config.DBURL())
 	if err != nil {
 		log.Fatal(err)
 	}

@@ -29,22 +29,22 @@ type PBServer struct {
 	status         int        // the server's current status (NORMAL, VIEWCHANGE or RECOVERING)
 	lastNormalView int        // the latest view which had a NORMAL status
 
-	log         []interface{} // the log of "commands"
-	commitIndex int           // all log entries <= commitIndex are considered to have been committed.
+	log         []Command // the log of "commands"
+	commitIndex int       // all log entries <= commitIndex are considered to have been committed.
 
 	// process 1 command
-	processCommand func(cmd interface{})
+	processCommand func(cmd Command)
 	// replace entire log
-	replaceCommands func(cmds []interface{})
+	replaceCommands func(cmds []Command)
 }
 
 // Prepare defines the arguments for the Prepare RPC
 // Note that all field names must start with a capital letter for an RPC args struct
 type PrepareArgs struct {
-	View          int         // the primary's current view
-	PrimaryCommit int         // the primary's commitIndex
-	Index         int         // the index position at which the log entry is to be replicated on backups
-	Entry         interface{} // the log entry to be replicated
+	View          int     // the primary's current view
+	PrimaryCommit int     // the primary's commitIndex
+	Index         int     // the index position at which the log entry is to be replicated on backups
+	Entry         Command // the log entry to be replicated
 }
 
 // PrepareReply defines the reply for the Prepare RPC
@@ -61,10 +61,10 @@ type RecoveryArgs struct {
 }
 
 type RecoveryReply struct {
-	View          int           // the view of the primary
-	Entries       []interface{} // the primary's log including entries replicated up to and including the view.
-	PrimaryCommit int           // the primary's commitIndex
-	Success       bool          // whether the Recovery request has been accepted or rejected
+	View          int       // the view of the primary
+	Entries       []Command // the primary's log including entries replicated up to and including the view.
+	PrimaryCommit int       // the primary's commitIndex
+	Success       bool      // whether the Recovery request has been accepted or rejected
 }
 
 type ViewChangeArgs struct {
@@ -72,14 +72,14 @@ type ViewChangeArgs struct {
 }
 
 type ViewChangeReply struct {
-	LastNormalView int           // the latest view which had a NORMAL status at the server
-	Log            []interface{} // the log at the server
-	Success        bool          // whether the ViewChange request has been accepted/rejected
+	LastNormalView int       // the latest view which had a NORMAL status at the server
+	Log            []Command // the log at the server
+	Success        bool      // whether the ViewChange request has been accepted/rejected
 }
 
 type StartViewArgs struct {
-	View int           // the new view which has completed view-change
-	Log  []interface{} // the log associated with the new new
+	View int       // the new view which has completed view-change
+	Log  []Command // the log associated with the new new
 }
 
 type StartViewReply struct {
@@ -120,7 +120,7 @@ func (srv *PBServer) viewStatus() (currentView int, statusIsNormal bool) {
 // getEntryAtIndex is called by tester to return the command replicated at
 // a specific log index. If the server's log is shorter than "index", then
 // ok = false, otherwise, ok = true
-func (srv *PBServer) getEntryAtIndex(index int) (ok bool, command interface{}) {
+func (srv *PBServer) getEntryAtIndex(index int) (ok bool, command Command) {
 	srv.mu.Lock()
 	defer srv.mu.Unlock()
 	if len(srv.log) > index {
@@ -140,8 +140,8 @@ func (srv *PBServer) kill() {
 // me is this server's index into peers.
 // startingView is the initial view (set to be zero) that all servers start in
 func Make(me int,
-	processCommand func(cmd interface{}),
-	replaceCommands func(cmds []interface{})) *PBServer {
+	processCommand func(cmd Command),
+	replaceCommands func(cmds []Command)) *PBServer {
 	srv := &PBServer{
 		me:              me,
 		processCommand:  processCommand,
@@ -149,7 +149,7 @@ func Make(me int,
 		status:          NORMAL,
 	}
 	// all servers' log are initialized with a dummy command at index 0
-	var v interface{}
+	var v Command
 	srv.log = append(srv.log, v)
 	return srv
 }
@@ -170,7 +170,7 @@ func Start(srv *PBServer, peers []*rpc.Client) {
 // *if it's eventually committed*. The second return value is the current
 // view. The third return value is true if this server believes it is
 // the primary.
-func (srv *PBServer) PushCommand(command interface{}, reply *bool) error {
+func (srv *PBServer) PushCommand(command Command, reply *bool) error {
 	srv.mu.Lock()
 	defer srv.mu.Unlock()
 	// if i am not the primary, forward message to primary
@@ -185,7 +185,7 @@ func (srv *PBServer) PushCommand(command interface{}, reply *bool) error {
 
 	srv.doProcessCommand(command)
 
-	go func(command interface{}, primaryServer *PBServer, log_length int) {
+	go func(command Command, primaryServer *PBServer, log_length int) {
 		cnt := 0
 		for i := 0; i < len(primaryServer.peers); i++ {
 			var reply PrepareReply
@@ -277,7 +277,7 @@ func (srv *PBServer) Recovery(args *RecoveryArgs, reply *RecoveryReply) error {
 	reply.Success = true
 	/*
 		View          int           // the view of the primary
-		Entries       []interface{} // the primary's log including entries replicated up to and including the view.
+		Entries       []Command // the primary's log including entries replicated up to and including the view.
 		PrimaryCommit int           // the primary's commitIndex
 		Success       bool          // whether the Recovery request has been accepted or rejected
 	*/
@@ -355,7 +355,7 @@ func (srv *PBServer) promptViewChange(newView int) {
 // if a quorum of successful replies exist, then ok is set to true.
 // otherwise, ok = false.
 func (srv *PBServer) determineNewViewLog(successfulReplies []*ViewChangeReply) (
-	ok bool, newViewLog []interface{}) {
+	ok bool, newViewLog []Command) {
 	srv.mu.Lock()
 	defer srv.mu.Unlock()
 
@@ -405,4 +405,12 @@ func (srv *PBServer) StartView(args *StartViewArgs, reply *StartViewReply) error
 	srv.currentView = args.View
 	srv.status = NORMAL
 	return nil
+}
+
+func IsPrimary(srv *PBServer) bool {
+	return Primary(srv) == srv.me
+}
+
+func Primary(srv *PBServer) int {
+	return GetPrimary(srv.currentView, len(srv.peers))
 }

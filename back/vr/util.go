@@ -47,14 +47,14 @@ func (srv *PBServer) debug(params ...interface{}) {
 	printFunc(params...)
 }
 
-func (srv *PBServer) doProcessCommand(cmds ...interface{}) {
+func (srv *PBServer) doProcessCommand(cmds ...Command) {
 	for _, cmd := range cmds {
 		srv.processCommand(cmd)
 		srv.log = append(srv.log, cmd)
 	}
 }
 
-func (srv *PBServer) doReplaceCommands(cmd []interface{}) {
+func (srv *PBServer) doReplaceCommands(cmd []Command) {
 	srv.log = cmd
 	srv.replaceCommands(cmd)
 }

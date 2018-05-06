@@ -46,36 +46,44 @@ func makeDBConfigs() []config.Config {
 	vrport1 := incrementDBPort()
 	vrport2 := incrementDBPort()
 	vrport3 := incrementDBPort()
+	dbport1 := incrementDBPort()
+	dbport2 := incrementDBPort()
+	dbport3 := incrementDBPort()
 	vrpeerURLs := []string{
 		fmt.Sprintf("localhost:%d", vrport1),
 		fmt.Sprintf("localhost:%d", vrport2),
 		fmt.Sprintf("localhost:%d", vrport3),
+	}
+	dbpeerURLs := []string{
+		fmt.Sprintf("localhost:%d", dbport1),
+		fmt.Sprintf("localhost:%d", dbport2),
+		fmt.Sprintf("localhost:%d", dbport3),
 	}
 
 	confs := []config.Config{
 		config.Config{
 			Role:       "db",
 			DBAddr:     "localhost",
-			DBPort:     fmt.Sprintf("%d", incrementDBPort()),
+			DBPort:     fmt.Sprintf("%d", dbport1),
 			VRPort:     fmt.Sprintf("%d", vrport1),
 			VRPeerURLs: vrpeerURLs,
-			VRPrimary:  0,
+			DBPeerURLs: dbpeerURLs,
 		},
 		config.Config{
 			Role:       "db",
 			DBAddr:     "localhost",
-			DBPort:     fmt.Sprintf("%d", incrementDBPort()),
+			DBPort:     fmt.Sprintf("%d", dbport2),
 			VRPort:     fmt.Sprintf("%d", vrport2),
 			VRPeerURLs: vrpeerURLs,
-			VRPrimary:  0,
+			DBPeerURLs: dbpeerURLs,
 		},
 		config.Config{
 			Role:       "db",
 			DBAddr:     "localhost",
-			DBPort:     fmt.Sprintf("%d", incrementDBPort()),
+			DBPort:     fmt.Sprintf("%d", dbport3),
 			VRPort:     fmt.Sprintf("%d", vrport3),
 			VRPeerURLs: vrpeerURLs,
-			VRPrimary:  0,
+			DBPeerURLs: dbpeerURLs,
 		},
 	}
 	return confs
@@ -119,16 +127,15 @@ func newDBCluster() ([]*db.Server, error) {
 // SetupTest - -
 func (suite *RouteTestSuite) SetupTest() {
 	// TODO: rewrite this part based on VR
-	// dbServer, err := =()
-	// suite.Require().NoError(err)
-	// suite.dbServer = dbServer
-	// go db.Server.StartSync()
+	dbServers, err := newDBCluster()
+	suite.Require().NoError(err)
+	suite.dbServer = dbServers[0]
 
-	// suite.ts = httptest.NewServer(NewServer(config.Config{
-	// 	Role:   "api",
-	// 	DBAddr: "localhost",
-	// 	DBPort: dbServer.Port(),
-	// }).router)
+	suite.ts = httptest.NewServer(NewServer(config.Config{
+		Role:   "api",
+		DBAddr: "localhost",
+		DBPort: suite.dbServer.Port(),
+	}).router)
 }
 
 func (suite *RouteTestSuite) runTestCase(tc TestCase) {

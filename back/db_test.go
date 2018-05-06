@@ -53,7 +53,7 @@ func (suite *TestSetGetSuite) TestGetSetSerial() {
 	client, err := db.NewClient(config.Config{
 		DBAddr: "localhost",
 		DBPort: suite.dbCluster[1].Port(),
-	})
+	}.DBURL())
 	suite.Require().NoError(err)
 	t1 := client.NewTable("t1")
 	for cs := range getTestCases(1000) {
@@ -71,7 +71,7 @@ func (suite *TestSetGetSuite) TestGetParallel() {
 	client, err := db.NewClient(config.Config{
 		DBAddr: "localhost",
 		DBPort: suite.dbCluster[1].Port(),
-	})
+	}.DBURL())
 	suite.Require().NoError(err)
 	t1 := client.NewTable("t1")
 	putTestCaseChan := getTestCases(1000)
@@ -111,7 +111,7 @@ func (suite *TestSetGetSuite) testSetDelParallel() {
 	client, err := db.NewClient(config.Config{
 		DBAddr: "localhost",
 		DBPort: suite.dbCluster[1].Port(),
-	})
+	}.DBURL())
 	suite.Require().NoError(err)
 	t1 := client.NewTable("t1")
 	putTestCaseChan := getTestCases(1000)
