@@ -131,7 +131,6 @@ func (suite *TweetTestSuite) Test() {
 			},
 			expCode: 200,
 			expBodyMap: map[string]string{
-				"tid":     "1",
 				"content": "tweet1",
 			},
 		},
@@ -143,7 +142,6 @@ func (suite *TweetTestSuite) Test() {
 			expCode: 200,
 			expBodyMapArr: []map[string]string{
 				map[string]string{
-					"tid":     "1",
 					"content": "tweet1",
 				},
 			},
@@ -156,7 +154,6 @@ func (suite *TweetTestSuite) Test() {
 			expCode: 200,
 			expBodyMapArr: []map[string]string{
 				map[string]string{
-					"tid":     "1",
 					"content": "tweet1",
 					"uname":   "big_v",
 				},
@@ -173,7 +170,6 @@ func (suite *TweetTestSuite) Test() {
 			expCode: 200,
 			expBodyMapArr: []map[string]string{
 				map[string]string{
-					"tid":     "1",
 					"content": "tweet1",
 					"uname":   "big_v",
 				},
@@ -182,32 +178,6 @@ func (suite *TweetTestSuite) Test() {
 
 		signInToBigV,
 		checkIsUser("big_v"),
-
-		TestCase{
-			desc:    "delete this tweet",
-			method:  "POST",
-			path:    "/tweet/del/1",
-			expCode: 200,
-		},
-
-		TestCase{
-			desc:          "no longer see tweet after delete",
-			method:        "GET",
-			path:          "/tweet/feed",
-			expCode:       200,
-			expBodyMapArr: []map[string]string{},
-		},
-
-		signInToUser,
-		checkIsUser("u1"),
-
-		TestCase{
-			desc:          "no longer see tweet after delete",
-			method:        "GET",
-			path:          "/tweet/feed",
-			expCode:       200,
-			expBodyMapArr: []map[string]string{},
-		},
 	}
 
 	for _, tc := range testcases {
@@ -225,9 +195,6 @@ func (suite *TweetTestSuite) Test() {
 func postTweet(desc, content string, tid string) TestCase {
 	expBodyMap := map[string]string{
 		"content": content,
-	}
-	if tid != "" {
-		expBodyMap["tid"] = tid
 	}
 
 	return TestCase{
@@ -355,7 +322,6 @@ func (suite *TweetTestSuite) TestPostNewAfterFollow() {
 			expBodyMapArr: []map[string]string{
 				map[string]string{
 					"content": "t1",
-					"tid":     "1",
 					"uname":   "u1",
 				},
 			},
@@ -371,12 +337,10 @@ func (suite *TweetTestSuite) TestPostNewAfterFollow() {
 			expBodyMapArr: []map[string]string{
 				map[string]string{
 					"content": "t2",
-					"tid":     "2",
 					"uname":   "u1",
 				},
 				map[string]string{
 					"content": "t1",
-					"tid":     "1",
 					"uname":   "u1",
 				},
 			},
@@ -402,7 +366,6 @@ func (suite *TweetTestSuite) TestPostNewAfterFollow() {
 			expBodyMapArr: []map[string]string{
 				map[string]string{
 					"content": "v tweet 1",
-					"tid":     "3",
 					"uname":   "big_v",
 				},
 			},
@@ -418,17 +381,14 @@ func (suite *TweetTestSuite) TestPostNewAfterFollow() {
 			expBodyMapArr: []map[string]string{
 				map[string]string{
 					"content": "v tweet 1",
-					"tid":     "3",
 					"uname":   "big_v",
 				},
 				map[string]string{
 					"content": "t2",
-					"tid":     "2",
 					"uname":   "u1",
 				},
 				map[string]string{
 					"content": "t1",
-					"tid":     "1",
 					"uname":   "u1",
 				},
 			},
@@ -446,12 +406,10 @@ func (suite *TweetTestSuite) TestPostNewAfterFollow() {
 			expBodyMapArr: []map[string]string{
 				map[string]string{
 					"content": "t2",
-					"tid":     "2",
 					"uname":   "u1",
 				},
 				map[string]string{
 					"content": "t1",
-					"tid":     "1",
 					"uname":   "u1",
 				},
 			},

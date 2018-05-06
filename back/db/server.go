@@ -16,11 +16,11 @@ type Server struct {
 	vrServer      *vr.PBServer
 	dbPeerClients []*Client
 	port          string
+	config        config.Config
 }
 
 func (server *Server) emitVRCommand(cmd vr.Command) error {
-	go server.vrServer.PushCommand(cmd, nil)
-	return nil
+	return server.vrServer.PushCommand(cmd, nil)
 }
 
 // RunServer make a db hosting server
@@ -79,6 +79,7 @@ func RunServer(config config.Config) (*Server, error) {
 	server.vrServer = vrServer
 	server.port = config.DBPort
 	server.dbPeerClients = dbPeerClients
+	server.config = config
 	return &server, nil
 }
 

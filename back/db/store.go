@@ -156,8 +156,6 @@ func (s *Store) Put(args PutArgs, ack *bool) error {
 		return nil
 	}
 
-	s.mLock.Lock()
-	defer s.mLock.Unlock()
 	return s.emitCommand(vr.Command{
 		Kind:  "Put",
 		Value: args,
@@ -175,8 +173,6 @@ func (s *Store) Del(args DelArgs, ack *bool) error {
 		return nil
 	}
 
-	s.mLock.Lock()
-	defer s.mLock.Unlock()
 	return s.emitCommand(vr.Command{
 		Kind:  "Del",
 		Value: args,
@@ -197,8 +193,6 @@ func (s *Store) IncID(args IncIDArgs, reply *IncIDReply) error {
 		return nil
 	}
 
-	s.mLock.Lock()
-	defer s.mLock.Unlock()
 	return s.emitCommand(vr.Command{
 		Kind:  "IncID",
 		Value: args,

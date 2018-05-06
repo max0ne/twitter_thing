@@ -10,7 +10,6 @@ import (
 	"fmt"
 	"net/rpc"
 	"sync"
-	//"fmt"
 )
 
 // the 3 possible server status
@@ -54,7 +53,7 @@ type PrepareReply struct {
 	Success bool // whether the Prepare request has been accepted or rejected
 }
 
-// RecoverArgs defined the arguments for the Recovery RPC
+// RecoveryArgs defined the arguments for the Recovery RPC
 type RecoveryArgs struct {
 	View   int // the view that the backup would like to synchronize with
 	Server int // the server sending the Recovery RPC (for debugging)
@@ -98,9 +97,9 @@ func GetPrimary(view int, nservers int) int {
 	return view % nservers
 }
 
-// isCommitted is called by tester to check whether an index position
+// IsCommitted is called by tester to check whether an index position
 // has been considered committed by this server
-func (srv *PBServer) isCommitted(index int) (committed bool) {
+func IsCommitted(srv *PBServer, index int) (committed bool) {
 	srv.mu.Lock()
 	defer srv.mu.Unlock()
 	if srv.commitIndex >= index {
@@ -170,12 +169,12 @@ func Start(srv *PBServer, peers []*rpc.Client) {
 // *if it's eventually committed*. The second return value is the current
 // view. The third return value is true if this server believes it is
 // the primary.
-func (srv *PBServer) PushCommand(command Command, reply *bool) error {
+func (srv *PBServer) PushCommand(command Command, reply *CommandReply) error {
 	srv.mu.Lock()
 	defer srv.mu.Unlock()
 	// if i am not the primary, forward message to primary
 	if GetPrimary(srv.currentView, len(srv.peers)) != srv.me {
-		srv.peers[GetPrimary(srv.currentView, len(srv.peers))].Call("PBServer.PushCommand", &command, nil)
+		srv.peers[GetPrimary(srv.currentView, len(srv.peers))].Call("PBServer.PushCommand", &command, reply)
 		return nil
 	}
 	// do not process command if status is not NORMAL
@@ -183,6 +182,11 @@ func (srv *PBServer) PushCommand(command Command, reply *bool) error {
 		return fmt.Errorf("vr server status not NORMAL, %d", srv.status)
 	}
 
+	if reply != nil {
+		*reply = CommandReply{
+			Index: len(srv.log),
+		}
+	}
 	srv.doProcessCommand(command)
 
 	go func(command Command, primaryServer *PBServer, log_length int) {
@@ -196,8 +200,8 @@ func (srv *PBServer) PushCommand(command Command, reply *bool) error {
 				Entry:         command,
 			}
 
-			rpc_ok := primaryServer.sendPrepare(i, &args, &reply)
-			if rpc_ok && reply.Success {
+			ok := primaryServer.sendPrepare(i, &args, &reply)
+			if ok && reply.Success {
 				cnt = cnt + 1
 				// If the primary has received Success=true responses from a majority of servers (including itself)
 				// it considers the corresponding log index as "committed".
