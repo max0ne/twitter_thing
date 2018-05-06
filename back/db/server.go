@@ -53,17 +53,8 @@ func RunServer(config config.Config) (*Server, error) {
 	fmt.Println("vr rpc server listening on", config.VRURL())
 	go vrRPCServer.Accept(vrConn)
 
-	// 5. sleep for a while to wait for all vr server to start listening
-	<-time.After(time.Second)
-
 	// 6. connect all vr peers
 	rpcClients, err := connectVRPeers(config)
-	if err != nil {
-		return nil, err
-	}
-
-	// 6.5. connect all db peers
-	dbPeerClients, err := connectDBPeers(config)
 	if err != nil {
 		return nil, err
 	}
@@ -75,23 +66,46 @@ func RunServer(config config.Config) (*Server, error) {
 	fmt.Println("db rpc server listening on", config.DBURL())
 	go dbRPCServer.Accept(dbConn)
 
+	<-time.After(time.Second)
+
+	// 6.5. connect all db peers
+	dbPeerClients, err := connectDBPeers(config)
+	if err != nil {
+		return nil, err
+	}
+
 	server.store = store
 	server.vrServer = vrServer
 	server.port = config.DBPort
 	server.dbPeerClients = dbPeerClients
 	server.config = config
+
 	return &server, nil
 }
 
 func connectVRPeers(config config.Config) ([]*rpc.Client, error) {
 	clients := []*rpc.Client{}
+	conenct := func(url string) chan *rpc.Client {
+		channel := make(chan *rpc.Client)
+		go func() {
+			for {
+				client, err := rpc.Dial("tcp", url)
+				if err == nil {
+					channel <- client
+				}
+				<-time.After(time.Microsecond * 10)
+			}
+		}()
+		return channel
+	}
+
 	for _, peerURL := range config.VRPeerURLs {
-		// connect peer
-		client, err := rpc.Dial("tcp", peerURL)
-		if err != nil {
-			return nil, err
+		select {
+		case <-time.After(time.Second * 5):
+			return nil, fmt.Errorf("timed out %s", peerURL)
+		case client := <-conenct(peerURL):
+			clients = append(clients, client)
 		}
-		clients = append(clients, client)
 	}
 	return clients, nil
 }

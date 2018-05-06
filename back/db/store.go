@@ -104,7 +104,6 @@ func (s *Store) GetM(args interface{}, reply *GetMReply) error {
 func (s *Store) Get(args GetArgs, reply *GetReply) error {
 	// get from primary if not me
 	if !vr.IsPrimary(s.server.vrServer) {
-		fmt.Println("getting from primary")
 		val, err := s.server.dbPeerClients[vr.Primary(s.server.vrServer)].Get(args.Key)
 		if err != nil {
 			return err

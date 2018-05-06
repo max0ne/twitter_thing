@@ -39,16 +39,41 @@ JWT Tokens issued from any api services is valid for all api services.
 A sample run configuration:
 1. Run db:
 ```
-Role=db DBAddr=localhost DBPort=4000 go run main.go
+# run db
+npx concurrently \
+"Role=db DBAddr=localhost DBPort=4000 VRPort=5000 \
+    VRPeerURLs=localhost:5000,localhost:5001,localhost:5002 \
+    DBPeerURLs=localhost:4000,localhost:4001,localhost:4002 \
+    go run main.go" \
+"Role=db DBAddr=localhost DBPort=4001 VRPort=5001 \
+    VRPeerURLs=localhost:5000,localhost:5001,localhost:5002 \
+    DBPeerURLs=localhost:4000,localhost:4001,localhost:4002 \
+    go run main.go" \
+"Role=db DBAddr=localhost DBPort=4002 VRPort=5002 \
+    VRPeerURLs=localhost:5000,localhost:5001,localhost:5002 \
+    DBPeerURLs=localhost:4000,localhost:4001,localhost:4002 \
+    go run main.go"
 ```
 
 2. Run however many number of api services you want each on a different port, i.e. *the frontend*, for example, 2
 ```
-# in a shell
-Role=api DBAddr=localhost DBPort=4000 PORT=8080 go run main.go
-
-# in another shell
-Role=api DBAddr=localhost DBPort=4000 PORT=8081 go run main.go
+# run api
+npx concurrently \
+"PORT=8080 \
+    Role=api DBAddr=localhost DBPort=4000 VRPort=5000 \
+    VRPeerURLs=localhost:5000,localhost:5001,localhost:5002 \
+    DBPeerURLs=localhost:4000,localhost:4001,localhost:4002 \
+    go run main.go" \
+"PORT=8081 \
+    Role=api DBAddr=localhost DBPort=4001 VRPort=5001 \
+    VRPeerURLs=localhost:5000,localhost:5001,localhost:5002 \
+    DBPeerURLs=localhost:4000,localhost:4001,localhost:4002 \
+    go run main.go" \
+"PORT=8082 \
+    Role=api DBAddr=localhost DBPort=4002 VRPort=5002 \
+    VRPeerURLs=localhost:5000,localhost:5001,localhost:5002 \
+    DBPeerURLs=localhost:4000,localhost:4001,localhost:4002 \
+    go run main.go"
 ```
 
 3. Run frontend, see docs [here](../front/README.md)

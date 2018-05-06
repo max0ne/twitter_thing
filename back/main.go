@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"log"
 	"net/http"
+	"strings"
 	"time"
 
 	"github.com/gin-contrib/cors"
@@ -370,9 +371,18 @@ func run(config config.Config) error {
 
 func main() {
 	config := config.Config{
-		Role:   util.GetEnvMust("Role"),
-		DBAddr: util.GetEnvMust("DBAddr"),
-		DBPort: util.GetEnvMust("DBPort"),
+		Role:       util.GetEnvMust("Role"),
+		DBAddr:     util.GetEnvMust("DBAddr"),
+		DBPort:     util.GetEnvMust("DBPort"),
+		VRPort:     util.GetEnvMust("VRPort"),
+		VRPeerURLs: strings.Split(util.GetEnvMust("VRPeerURLs"), ","),
+		DBPeerURLs: strings.Split(util.GetEnvMust("DBPeerURLs"), ","),
 	}
-	run(config)
+	err := run(config)
+	if err != nil {
+		log.Fatal(err)
+	}
+	for {
+		<-time.After(time.Hour)
+	}
 }
