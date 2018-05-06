@@ -26,6 +26,7 @@ type Server struct {
 
 type globalTables struct {
 	userTable     *db.Table
+	miscTable     *db.Table
 	tweetTable    *db.Table
 	bucketTable   *db.Table
 	postedByTable *db.Table
@@ -86,7 +87,6 @@ func (s *Server) signup(c *gin.Context) {
 	if c.Bind(&param) != nil {
 		return
 	}
-	fmt.Println(param.Uname, param.Password)
 
 	// check whether the user already exists
 	oldUser, err := model.GetUser(param.Uname, s.tables.userTable)
@@ -99,7 +99,7 @@ func (s *Server) signup(c *gin.Context) {
 		return
 	}
 
-	err = model.SaveUser(model.NewUser(param.Uname, param.Password), s.tables.userTable)
+	err = model.SaveUser(model.NewUser(param.Uname, param.Password), s.tables.userTable, s.tables.miscTable)
 	if cerr(c, err) {
 		return
 	}
@@ -295,6 +295,19 @@ func (s *Server) getFeed(c *gin.Context) {
 	sendObj(c, tweets)
 }
 
+func (s *Server) getNewRegisterUsers(c *gin.Context) {
+	unames, err := model.GetNewRegisteredUserNames(s.tables.miscTable)
+	if cerr(c, err) {
+		return
+	}
+	requestUser := middleware.GetUser(c)
+	if requestUser != nil {
+		unames = util.Remove(unames, requestUser.Uname)
+	}
+	users := model.GetUsers(unames, s.tables.userTable)
+	sendObj(c, users)
+}
+
 // NewServer - make a server
 func NewServer(config config.Config) Server {
 	dbClient, err := db.NewClient(config.DBURL())
@@ -302,6 +315,7 @@ func NewServer(config config.Config) Server {
 		log.Fatal(err)
 	}
 	tables := globalTables{
+		miscTable:      dbClient.NewTable("miscTable"),
 		userTable:      dbClient.NewTable("userTable"),
 		tweetTable:     dbClient.NewTable("tweetTable"),
 		bucketTable:    dbClient.NewTable("bucketTable"),
@@ -336,6 +350,7 @@ func (s *Server) NewRouter() *gin.Engine {
 	router.POST("/user/unregister", middleware.RequireLogin, s.unregister)
 	router.GET("/user/get/:uname", s.getUser)
 	router.GET("/user/me", middleware.RequireLogin, s.getCurrentUser)
+	router.GET("/user/new", s.getNewRegisterUsers)
 
 	router.POST("/user/follow/:uname", middleware.RequireLogin, s.follow)
 	router.POST("/user/unfollow/:uname", middleware.RequireLogin, s.unfollow)

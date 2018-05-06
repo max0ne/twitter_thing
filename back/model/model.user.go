@@ -1,12 +1,13 @@
 package model
 
 import (
-	"encoding/json"
 	"strings"
 
 	"github.com/max0ne/twitter_thing/back/db"
 	"github.com/max0ne/twitter_thing/back/util"
 )
+
+const keyNewRegisteredUsers = "keyNewRegisteredUsers"
 
 // User - -
 type User struct {
@@ -62,13 +63,11 @@ func GetUsers(unames []string, userTable *db.Table) []User {
 }
 
 // SaveUser - -
-func SaveUser(user User, table *db.Table) error {
-	bytes, err := json.Marshal(user)
-	if err != nil {
+func SaveUser(user User, userTable *db.Table, miscTable *db.Table) error {
+	if err := userTable.PutObj(user.Uname, user); err != nil {
 		return err
 	}
-	table.Put(user.Uname, string(bytes))
-	return nil
+	return PutNewRegisteredUserName(user.Uname, miscTable)
 }
 
 // DeleteUser - -
@@ -124,4 +123,36 @@ func GetFollowers(vname string, followerTable *db.Table) ([]string, error) {
 // GetFollowing - -
 func GetFollowing(vname string, followerTable *db.Table) ([]string, error) {
 	return GetFollowers(vname, followerTable)
+}
+
+// GetNewRegisteredUserNames get list of recently registered users' names
+func GetNewRegisteredUserNames(miscTable *db.Table) ([]string, error) {
+	newRegisteredUserNames := []string{}
+	err := miscTable.GetObj(keyNewRegisteredUsers, &newRegisteredUserNames)
+	if err != nil {
+		return nil, err
+	}
+	return newRegisteredUserNames, nil
+}
+
+// PutNewRegisteredUserName append a new value to newly registered users list
+func PutNewRegisteredUserName(uname string, miscTable *db.Table) error {
+	has, err := miscTable.Has(keyNewRegisteredUsers)
+	if err != nil {
+		return err
+	}
+
+	newRegisteredUserNames := []string{}
+	if has {
+		err = miscTable.GetObj(keyNewRegisteredUsers, &newRegisteredUserNames)
+		if err != nil {
+			return err
+		}
+	}
+	newRegisteredUserNames = append(newRegisteredUserNames, uname)
+	// only keep recent 10 items
+	if len(newRegisteredUserNames) > 10 {
+		newRegisteredUserNames = newRegisteredUserNames[len(newRegisteredUserNames)-10:]
+	}
+	return miscTable.PutObj(keyNewRegisteredUsers, newRegisteredUserNames)
 }

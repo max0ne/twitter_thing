@@ -68,7 +68,6 @@ func NewRPC(url string, rcvr interface{}) (*net.TCPListener, *rpc.Server, error)
 // LogColor - -
 func LogColor(idx int) func(a ...interface{}) (n int, err error) {
 	return color.New([]color.Attribute{
-		color.FgRed,
 		color.FgGreen,
 		color.FgYellow,
 		color.FgBlue,
