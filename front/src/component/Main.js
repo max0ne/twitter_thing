@@ -12,6 +12,7 @@ import {
 import Navbar from './Navbar';
 import Feed from './Feed';
 import Login from './Login';
+import NewUsers from './NewUsers';
 
 import * as middleware from '../redux/middleware';
 import config from '../config';
@@ -46,6 +47,7 @@ class Main extends Component {
       <div>
         <Navbar />
         <Switch>
+          <Route path='/new_user' render={(props) => <NewUsers {...props} />} />
           <Route path="/login" render={(props) => <Login {...props} />} />
           <Route path="/feed/:uname" render={(props) => <Feed {...props} />} />
         </Switch>

@@ -77,3 +77,7 @@ export async function getUserTweets(tid) {
 export async function getFeed() {
   return client.get(`/tweet/feed`);
 }
+
+export async function getNewUsers() {
+  return client.get(`/user/new`);
+}

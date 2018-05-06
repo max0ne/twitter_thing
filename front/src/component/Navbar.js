@@ -84,6 +84,9 @@ class Navbar extends Component {
         <Menu.Item name='twitter-thing'>
           twitter-thing
         </Menu.Item>
+        <Menu.Item as={Link} to='/new_user'>
+          users
+        </Menu.Item>
 
         <Menu.Menu position='right'>
         {
