@@ -1,4 +1,5 @@
 <!-- $theme: default -->
+<!-- page_number: true -->
 
 twitter_thing
 ===
@@ -35,7 +36,7 @@ Architecture
 	- get, set, del
 - VR replica forwards DB requests to VR primary
 - VR primary send write operations as VR command
-	- get_command, set_command
+	- set_command, del_command
 
 ---
 
@@ -52,3 +53,7 @@ Architecture
 
 - Some JS code
 - Connect a user configured API endpoint
+
+---
+
+# DEMO
