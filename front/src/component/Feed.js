@@ -182,7 +182,7 @@ class Feed extends Component {
     return (
       <Header as='h2' icon textAlign='center'>
         <Header.Content>
-          <p>🤷</p>
+          <p><span role="img" aria-label="user not fofund">🤷</span></p>
           {this.getuname()} not found
         </Header.Content>
       </Header>

@@ -1,4 +1,3 @@
-import config from '../config';
 
 export default (state = { currentUser: undefined }, action) => {
   switch (action.type) {

@@ -61,7 +61,6 @@ class NewUsers extends Component {
   }
 
   render() {
-    const tweet = this.props.tweet;
     return (
       <Item.Group divided>
         {this.state.users.map(this.renderUser.bind(this))}
