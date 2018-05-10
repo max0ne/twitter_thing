@@ -46,7 +46,16 @@ class Feed extends Component {
     return this.props.match.params.uname;
   }
 
-  async componentWillMount() {
+  componentWillMount() {
+    this.reloadData();
+    this.intervalToken = setInterval(this.reloadData.bind(this), 1000);
+  }
+
+  componentWillUnmount() {
+    this.intervalToken && clearInterval(this.intervalToken);
+  }
+
+  async reloadData() {
     await this.reloadUser();
     this.reloadTweets();
     this.reloadFollowers();

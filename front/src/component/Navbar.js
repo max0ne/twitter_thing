@@ -79,9 +79,10 @@ class Navbar extends Component {
   }
 
   render() {
+    const logoLink = `/feed/${(this.props.currentUser && this.props.currentUser.uname) || '/'}`;
     return (
       <Menu>
-        <Menu.Item name='twitter-thing'>
+        <Menu.Item name='twitter-thing' as={Link} to={logoLink}>
           twitter-thing
         </Menu.Item>
         <Menu.Item as={Link} to='/new_user'>
