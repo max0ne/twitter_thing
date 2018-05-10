@@ -17,7 +17,7 @@ Mingfei Huang | mh4925
 ---
 
 Architecture
-![Architecture](Distributed_System.png)
+![Architecture](./Distributed_System.png)
 
 ---
 
