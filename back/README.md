@@ -40,7 +40,7 @@ A sample run configuration:
 1. Run db:
 ```
 # run db
-npx concurrently \
+npx concurrently -c green,blue,magenta \
 "Role=db DBAddr=localhost DBPort=4000 VRPort=5000 \
     VRPeerURLs=localhost:5000,localhost:5001,localhost:5002 \
     DBPeerURLs=localhost:4000,localhost:4001,localhost:4002 \
@@ -58,7 +58,7 @@ npx concurrently \
 2. Run however many number of api services you want each on a different port, i.e. *the frontend*, for example, 2
 ```
 # run api
-npx concurrently \
+npx concurrently -c green,blue,magenta \
 "PORT=8080 \
     Role=api DBAddr=localhost DBPort=4000 VRPort=5000 \
     VRPeerURLs=localhost:5000,localhost:5001,localhost:5002 \
