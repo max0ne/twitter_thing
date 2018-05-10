@@ -3,6 +3,7 @@
 
 twitter_thing
 ===
+*a very not fancy twitter implementation*
 
 Qiming Zhang | qz718
 Mingfei Huang | mh4925
